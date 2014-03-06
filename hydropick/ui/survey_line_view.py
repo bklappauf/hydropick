@@ -13,7 +13,7 @@ import numpy as np
 # ETS imports
 from traits.api import (Instance, Str, Dict, List, Int, Property,
                         on_trait_change)
-from traitsui.api import ModelView, View, VGroup
+from traitsui.api import ModelView, View, VGroup, Label, Item, EnumEditor
 
 from chaco.api import (Plot, ArrayPlotData, PlotComponent)
 
@@ -23,7 +23,7 @@ from .survey_data_session import SurveyDataSession
 from .survey_tools import TraceTool, LocationTool, DepthTool
 from .survey_views import (ControlView, InstanceUItem, PlotContainer, DataView,
                            ImageAdjustView, AddDepthLineView,
-                           HPlotSelectionView)
+                           HPlotSelectionView, SetFinalDepthLineView)
 from ..model.core_sample import CoreSample
 
 logger = logging.getLogger(__name__)
@@ -62,6 +62,9 @@ class SurveyLineView(ModelView):
 
     # defines popup window for new depth line creation
     add_depth_line_view = Instance(AddDepthLineView)
+    
+    # define popup for setting or viewing final depthline setting
+    #set_final_depth_line_view = Instance(SetFinalDepthLineView)
 
     # Dictionary of plots kept for legend and for tools.
     # Will contain all depth lines at least.  This contains components as
@@ -100,6 +103,9 @@ class SurveyLineView(ModelView):
     # name chosen from UI to apply
     algorithm_name = Str
 
+    lake_depth_choices = Property(depends_on='model.lake_depths')
+    preimpoundment_depth_choices = Property(depends_on='model.preimpoundment_depths')
+
     # name to give to resulting depth line
     new_line_name = Str
     #==========================================================================
@@ -112,6 +118,14 @@ class SurveyLineView(ModelView):
             InstanceUItem('plot_container'),
         ),
         resizable=True,
+    )
+
+    final_depth_view = View(
+        Label('View or Set current final depth line choices for this survey line'),
+        Item('model.final_lake_depth', editor=EnumEditor(name='lake_depth_choices')),
+        Item('model.final_preimpoundment_depth',
+             editor=EnumEditor(name='preimpoundment_depth_choices')),
+        resizable=True
     )
 
     #==========================================================================
@@ -227,11 +241,21 @@ class SurveyLineView(ModelView):
         iav.on_trait_event(self.adjust_image, name='invert')
         iav.on_trait_event(self.adjust_image, name='frequency')
         return iav
+    
+    def _set_final_depth_line_view_default(self):
+        view = SetFinalDepthLineView()
+        view.lake_depth_choices = self.model.lake_depths.keys()
+        view.preimpoundment_depth_choices = self.model.preimpoundment_depth.keys()
+        view.final_lake_depth = self.model.final_lake_depth
+        view.final_preimpoundment_depth = self.model.final_preimpoundment_depth
+        iav.on_trait_change(self.set_final_depths,
+                            name='final_lake_depth, final_preimpoundment_depth')
+        return iav
 
     #==========================================================================
     # Helper functions
     #==========================================================================
-
+        
     def create_data_array(self):
         '''want data array to have all data in it :
             3x img    min=1  (1 per hplot)
@@ -297,6 +321,10 @@ class SurveyLineView(ModelView):
 
     def show_data_dialog(self):
         self.data_view.configure_traits()
+        
+    def show_final_depth_line_dialog(self):
+        print 'setting final view'
+        self.configure_traits(view="final_depth_view")
 
     def new_algorithm_line_dialog(self):
         ''' called from UI button to bring up add line dialog'''

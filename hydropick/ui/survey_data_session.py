@@ -14,7 +14,7 @@ import logging
 import numpy as np
 
 # ETS imports
-from traits.api import (Instance, HasTraits, Property, List,
+from traits.api import (Instance, HasTraits, Property, List, on_trait_change,
                         Str, Dict, DelegatesTo, Event)
 
 # Local imports
@@ -62,7 +62,8 @@ class SurveyDataSession(HasTraits):
     lake_depths = DelegatesTo('survey_line')
 
     #: final choice for line used as current lake depth for volume calculations
-    final_lake_depth = Instance(DepthLine)
+    final_lake_depth = DelegatesTo('survey_line')
+    lake_depth_choices = List
 
     # and event fired when the lake depths are updated
     lake_depths_updated = Event
@@ -71,7 +72,8 @@ class SurveyDataSession(HasTraits):
     preimpoundment_depths = DelegatesTo('survey_line', 'preimpoundment_depths')
 
     #: final choice for pre-impoundment depth to track sedimentation
-    final_pre_imp_depth = Instance(DepthLine)
+    final_preimpoundment_depth = DelegatesTo('survey_line')
+    preimpoundment_depth_choices = List
 
     # and event fired when the lake depth is updated
     preimpoundment_depths_updated = Event
@@ -80,6 +82,7 @@ class SurveyDataSession(HasTraits):
     pixel_depth_offset = DelegatesTo('survey_line', 'draft')
     pixel_depth_scale = DelegatesTo('survey_line', 'pixel_resolution')
 
+   
     ##### ADDITIONAL TRAITS FOR FUNCTIONALITY #################################
 
     #: Dictionary of all depth lines. Allows editor easy access to all lines.
@@ -91,7 +94,18 @@ class SurveyDataSession(HasTraits):
 
     # Keys of depth_dict provides list of target choices for line editor
     target_choices = Property(depends_on='depth_dict')
-
+    
+    @on_trait_change('target_choices')
+    def update_choices(self):
+        if isinstance(self.lake_depths, dict):
+            self.lake_depth_choices = self.lake_depths.keys()
+        else:
+            self.lake_depth_choices = {}
+        if isinstance(self.preimpoundment_depths, dict):
+            self.preimpoundment_depth_choices = self.preimpoundment_depths.keys()
+        else:
+            self.preimpoundment_depths = {}
+            
     # Selected target line key from depth dict for editing
     selected_target = Str
 
@@ -115,7 +129,23 @@ class SurveyDataSession(HasTraits):
     #==========================================================================
     # Defaults
     #==========================================================================
-
+    def _lake_depth_choices_default(self):
+        print 'getting lake depth choices'
+        if isinstance(self.lake_depths, dict):
+            choices = self.lake_depths.keys()
+        else:
+            choices = []
+        return choices
+            
+    def _preimpoundment_depth_choices_default(self):
+        if isinstance(self.preimpoundment_depths, dict):
+            choices = self.preimpoundment_depths.keys()
+        elif isinstance(self.lake_depths, dict):
+            choices = self.lake_depths.keys()
+        else:
+            choices = []
+        return choices
+        
     def _survey_line_default(self):
         s = SurveyLine()
         s.frequencies = {}

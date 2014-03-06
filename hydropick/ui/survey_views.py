@@ -616,6 +616,20 @@ class ImageAdjustView(HasTraits):
         return (self.contrast, self.brightness)
 
 
+class SetFinalDepthLineView(HasTraits):
+   
+    lake_depth_choices = List
+    final_lake_depth = Str
+    preimpoundment_depth_choices = List
+    final_preimpoundment_depth = Str
+
+    traits_view = View(
+        Label('View or Set current final depth line choices for this survey line'),
+        Item('final_lake_depth', editor=EnumEditor(name='lake_depth_choices')),
+        Item('final_preimpoundment_depth', editor=EnumEditor(name='preimpoundment_depth_choices')),
+        resizable=True
+    )
+
 class HPlotSelectionView(HasTraits):
     ''' provide checkbox pop up to set visibilty of hplots'''
 

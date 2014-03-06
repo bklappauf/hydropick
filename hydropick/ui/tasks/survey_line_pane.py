@@ -55,7 +55,11 @@ class SurveyLinePane(TraitsTaskPane):
 
     # set when survey_line is none to prevent showing invalid view.
     show_view = Bool(False)
-
+    
+    def on_set_final_depths(self):
+        ''' open dialog for final depth line settings'''
+        self.survey_line_view.show_final_depth_line_dialog()
+        
     def on_image_adjustment(self):
         ''' Open dialog to adjust image (B&C : task menu)'''
         self.survey_line_view.image_adjustment_dialog()

@@ -53,7 +53,7 @@ class SurveyLine(HasTraits):
     lake_depths = Dict(Str, Supports(IDepthLine))
 
     #: final choice for line used as current lake depth for volume calculations
-    final_lake_depth = Instance(DepthLine)
+    final_lake_depth = Str
 
     # and event fired when the lake depths are updated
     lake_depths_updated = Event
@@ -65,7 +65,7 @@ class SurveyLine(HasTraits):
     preimpoundment_depths = Dict(Str, Supports(IDepthLine))
 
     #: final choice for pre-impoundment depth to track sedimentation
-    final_pre_imp_depth = Instance(DepthLine)
+    final_preimpoundment_depth = Str
     
     # and event fired when the lake depth is updated
     preimpoundment_depths_updated = Event
