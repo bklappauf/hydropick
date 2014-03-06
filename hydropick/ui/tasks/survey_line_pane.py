@@ -7,17 +7,18 @@
 
 from __future__ import absolute_import
 
-from traits.api import DelegatesTo, Instance, Property, Bool, Dict, List, Str, Supports, DelegatesTo
+import logging
+from traits.api import (DelegatesTo, Instance, Property, Bool, Dict, List, Str,
+                        Supports)
 from traitsui.api import View, Item
 from pyface.tasks.api import TraitsTaskPane
 
 from ...model.i_survey_line import ISurveyLine
 from ..survey_data_session import SurveyDataSession
 from ..survey_line_view import SurveyLineView
-from .survey_task import SurveyTask
 from hydropick.model.i_core_sample import ICoreSample
 
-
+logger = logging.getLogger(__name__)
 
 class SurveyLinePane(TraitsTaskPane):
     """ The dock pane holding the map view of the survey """
@@ -31,6 +32,8 @@ class SurveyLinePane(TraitsTaskPane):
     # listener is set up in 'task.create_central_pane' to change line.
 
     survey_line = Instance(ISurveyLine)
+
+    current_data_session = DelegatesTo('task')
 
     core_samples = List(Supports(ICoreSample))
 
@@ -64,13 +67,17 @@ class SurveyLinePane(TraitsTaskPane):
         ''' Open dialog to adjust image (B&C : task menu)'''
         self.survey_line_view.image_adjustment_dialog()
 
+    def on_cursor_freeze(self):
+        ''' Currently just shows Key Binding to freeze cursor'''
+        pass
+
+    def on_change_colormap(self):
+        ''' Open dialog to adjust image (B&C : task menu)'''
+        self.survey_line_view.cmap_edit_dialog()
+
     def on_show_location_data(self):
         ''' Open dialog to show location data (task menu)'''
         self.survey_line_view.show_data_dialog()
-
-    def on_new_depth_line(self):
-        ''' Open dialog to create new depth line (task menu)'''
-        self.survey_line_view.new_algorithm_line_dialog()
 
     def on_show_plot_view_selection(self):
         ''' Open dialog to change which plots to view (task menu)'''
@@ -81,15 +88,20 @@ class SurveyLinePane(TraitsTaskPane):
         provide an empty view.
         '''
         if self.survey_line is None:
+            logger.warning('current survey line is None')
             self.show_view = False
             self.survey_line_view = None
         else:
             data_session = self.data_session_dict.get(self.line_name, None)
             if data_session is None:
                 # create new datasession object and entry for this surveyline.
-                self.survey_line.load_data(self.survey.hdf5_file)
-                data_session = SurveyDataSession(survey_line=self.survey_line)
+                if self.survey_line.trace_num.size == 0:
+                    # need to load data for this line
+                    self.survey_line.load_data(self.survey.hdf5_file)
+                data_session = SurveyDataSession(survey_line=self.survey_line,
+                                                 algorithms=self.algorithms)
                 self.data_session_dict[self.line_name] = data_session
+            self.current_data_session = data_session
 
             # load relevant core samples into survey line
             # must do this before creating survey line view
@@ -98,8 +110,7 @@ class SurveyLinePane(TraitsTaskPane):
             self.survey_line.core_samples = near_samples
 
             # create survey line view
-            self.survey_line_view = SurveyLineView(model=data_session,
-                                                   algorithms=self.algorithms)
+            self.survey_line_view = SurveyLineView(model=data_session)
             self.show_view = True
 
     view = View(

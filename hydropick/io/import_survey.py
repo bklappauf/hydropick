@@ -26,13 +26,12 @@ def get_name(directory):
     grandparent, parent_name = os.path.split(parent)
     great_grandparent, grandparent_name = os.path.split(grandparent)
     if parent_name and grandparent_name:
-        name = grandparent_name + ' ' + parent_name
+        name = grandparent_name + '_' + parent_name
     elif parent_name:
         name = parent_name
     else:
         name = "Untitled"
     return name
-
 
 def import_cores(directory):
     from sdi import corestick
@@ -76,6 +75,7 @@ def import_sdi(directory, h5file):
         Nf = len(files)
         stepf = 0
         stepd += 1
+        print root, dirs, files
         for filename in files:
             stepf += 1
             if os.path.splitext(filename)[1] == '.bin':
@@ -98,9 +98,10 @@ def import_sdi(directory, h5file):
                         s = 'Reading file {} failed with error "{}"'
                         msg = s.format(filename, e)
                         warnings.warn(msg)
-                        logger.warning(msg)
-                        break
-                group_lines.append(line)
+                        logger.warn(msg)
+                        line = None
+                if line:
+                    group_lines.append(line)
         if group_lines:
             dirname = os.path.basename(root)
             group = SurveyLineGroup(name=dirname, survey_lines=group_lines)

@@ -91,7 +91,7 @@ class SurveyMapView(ModelView):
     line_select_tool = Instance(BaseTool)
 
     #: distance tolerance in data units on map (feet by default)
-    tol = Float(100)
+    tol = Float(200)
 
     #: proxy for the task's current survey line
     current_survey_line = Instance(ISurveyLine)
@@ -195,23 +195,29 @@ class SurveyMapView(ModelView):
         plot.tools.append(PanTool(plot))
         plot.tools.append(ZoomTool(plot))
         self.line_select_tool = LineSelectTool(plot, line_plots=self.line_plots)
+        # single click in map sets 'select point':  toggle in selected lines
         self.line_select_tool.on_trait_event(self.select_point, 'select_point')
+        # double click in map sets 'current point': change current survey line
         self.line_select_tool.on_trait_event(self.current_point, 'current_point')
         plot.tools.append(self.line_select_tool)
         return plot
 
     def select_point(self, event):
+        ''' single click in map toggles line selection status in selected lines
+        '''
         p = Point(event)
         for line in self.survey_lines:
             if line.navigation_line.distance(p) < self.tol:
                 self._select_line(line)
 
     def current_point(self, event):
+        ''' double click in map sets line as current survey line (for editing)
+        '''
         p = Point(event)
         for line in self.survey_lines:
             if line.navigation_line.distance(p) < self.tol:
-                self._current_line(line)
-                # never want to set more than one line to current
+                self.current_survey_line = line
+                # never want to set more than one line to current so break now
                 break
 
     def _select_line(self, line):
@@ -220,7 +226,3 @@ class SurveyMapView(ModelView):
             self.selected_survey_lines.remove(line)
         else:
             self.selected_survey_lines.append(line)
-
-    def _current_line(self, line):
-        print 'set current to', line.name
-        self.current_survey_line = line

@@ -25,22 +25,21 @@ import numpy as np
 # ETS imports
 from enable.api import ComponentEditor
 from traits.api import (Instance, Str, List, HasTraits, Float, Property,
-                        Button, Enum, Bool, Dict, on_trait_change, Trait,
+                        Enum, Bool, Dict, on_trait_change, Trait,
                         Callable, Tuple, CFloat)
-from traitsui.api import (View, Group, Item, EnumEditor, UItem, InstanceEditor,
-                          RangeEditor, Label, HGroup, CheckListEditor)
+from traitsui.api import (View, Item, EnumEditor, UItem, InstanceEditor,
+                          TextEditor, RangeEditor, Label, HGroup,
+                          CheckListEditor, Group)
 from chaco import default_colormaps
 from chaco.api import (Plot, ArrayPlotData, VPlotContainer, HPlotContainer,
                        Legend, create_scatter_plot, PlotComponent,
-                       create_line_plot)
+                       create_line_plot, DataRange1D)
 from chaco.tools.api import (PanTool, ZoomTool, RangeSelection, LineInspector,
                              RangeSelectionOverlay, LegendHighlighter)
 
 # Local imports
-from ..model.depth_line import DepthLine
 from .survey_tools import InspectorFreezeTool
 from .survey_data_session import SurveyDataSession
-from ..model.core_sample import CoreSample
 
 # global constants
 # these still need to be tweaked to get the right look
@@ -59,7 +58,7 @@ MINI_PADDING = 15
 
 CONTRAST_MAX = float(20)
 
-CORE_VISIBILITY_CRITERIA = 200
+CORE_VISIBILITY_CRITERIA = 200.0
 CORE_LINE_WIDTH = 2
 
 
@@ -68,6 +67,19 @@ class InstanceUItem(UItem):
 
     style = Str('custom')
     editor = Instance(InstanceEditor, ())
+
+
+class ColormapEditView(HasTraits):
+    ''' provides dialog box to select colormap'''
+
+    colormap = Enum(COLORMAPS)
+
+    traits_view = View(
+        Group(Label('Frequency to Edit'),
+              Item('colormap')
+              ),
+        buttons=["OK", "Cancel"],
+        )
 
 
 class PlotContainer(HasTraits):
@@ -113,6 +125,8 @@ class PlotContainer(HasTraits):
 
     # private traits
     _cmap = Trait(default_colormaps.Spectral, Callable)
+
+    main_value_range = Instance(DataRange1D)
     #==========================================================================
     # Define Views
     #==========================================================================
@@ -139,14 +153,23 @@ class PlotContainer(HasTraits):
                                    )
         return tool
 
-    def _colormap_changed(self):
-        self._cmap = default_colormaps.color_map_name_dict[self.colormap]
-
     def _core_plot_dict_default(self):
         d = {}
         for core in self.model.core_samples:
             d[core.core_id] = []
 
+    def __cmap_default(self):
+        cm = default_colormaps.color_map_name_dict[self.img_colormap]
+        return cm
+
+    def _img_colormap_default(self):
+        return DEFAULT_COLORMAP
+
+    def _main_value_range_default(self):
+        dr = DataRange1D()
+        dr.set_bounds('auto', 'auto')
+        return dr
+    
     #==========================================================================
     # Helper functions
     #==========================================================================
@@ -208,7 +231,7 @@ class PlotContainer(HasTraits):
                     main.x_axis.visible = False
                     hpc.padding_bottom = MAIN_PADDING_BOTTOM
 
-                legend = self.legend_dict.get(freq, None)
+                legend, highlighter = self.legend_dict.get(freq, [None, None])
                 if legend:
                     legend.visible = (freq == top)
 
@@ -294,7 +317,7 @@ class PlotContainer(HasTraits):
 
         # add line plots: use method since these may change
         #************************************************************
-        self.update_line_plots(key, main)
+        self.update_line_plots(key, main, update=True)
 
         # set slice plot index range to follow main plot value range
         #************************************************************
@@ -315,7 +338,7 @@ class PlotContainer(HasTraits):
         #************************************************************
         if mini:
             # add range selection tool only
-            # first add a reference line to attache it to
+            # first add a reference line to attach it to
             reference = self.make_reference_plot()
             main.add(reference)
             # attache range selector to this plot
@@ -336,7 +359,7 @@ class PlotContainer(HasTraits):
                                       constrain=True,
                                       constrain_direction='y'))
             main.tools.append(ZoomTool(main, tool_mode='range', axis='value'))
-
+            main.value_mapper.on_trait_change(self.zoom_all, 'updated')
             # add line inspector and attach to freeze tool
             #*********************************************
             line_inspector = LineInspector(component=img_plot,
@@ -365,10 +388,9 @@ class PlotContainer(HasTraits):
             legend_highlighter = LegendHighlighter(legend,
                                                    drag_button="right")
             legend.tools.append(legend_highlighter)
-            for k, v in self.model.depth_dict.items():
-                legend.plots[k] = main.plots[k]
+            self.update_legend_plots(legend, main)
             legend.visible = False
-            self.legend_dict[key] = legend
+            self.legend_dict[key] = [legend, legend_highlighter]
             main.overlays.append(legend)
 
             # add main and slice plot to hplot container and dict
@@ -380,17 +402,37 @@ class PlotContainer(HasTraits):
 
         return hpc
 
+    def update_legend_plots(self, legend, plot):
+        ''' update legend if lines added or changed'''
+        for k, v in self.model.depth_dict.items():
+            legend.plots[k] = plot.plots[k]
 
-    def update_line_plots(self, key, plot):
+    def update_all_line_plots(self, update=False):
+        ''' reload all line plots when added or changed'''
+        for key in self.model.freq_choices:
+            hpc = self.hplot_dict[key]
+            plot = hpc.components[0]
+            self.update_line_plots(key, plot, update=update)
+            legend, highlighter = self.legend_dict[key]
+            self.update_legend_plots(legend, plot)
+            legend_highlighter = LegendHighlighter(legend,
+                                                   drag_button="right")
+            if highlighter in legend.tools:
+                legend.tools.remove(highlighter)
+            legend.tools.append(legend_highlighter)
+            plot.invalidate_and_redraw()
+
+    def update_line_plots(self, key, plot, update=False):
         ''' takes a Plot object and adds all available line plots to it.
         Each Plot.plots has one img plot labeled by freq key and the rest are
         line plots.  When depth_dict is updated, check all keys to see all
-        lines are plotted'''
+        lines are plotted.  Update=True will replot all lines even if already
+        there (for style changes)'''
 
         for line_key, depth_line in self.model.depth_dict.items():
             not_plotted = line_key not in plot.plots
             not_image = line_key not in self.model.freq_choices
-            if not_plotted and not_image:
+            if (not_plotted or update) and not_image:
                 line_plot = self.plot_depth_line(key, line_key,
                                                  depth_line, plot)
                 # note: plot dict needs 3 entries for every line since each
@@ -405,7 +447,7 @@ class PlotContainer(HasTraits):
         if line_key not in self.data.arrays.keys():
             x = self.model.distance_array[depth_line.index_array]
             y = depth_line.depth_array
-            key_x, key_y = line_key + '_x',  line_key + '_y'
+            key_x, key_y = line_key + '_x', line_key + '_y'
             self.data.update({key_x: x, key_y: y})
 
         # now plot
@@ -419,6 +461,7 @@ class PlotContainer(HasTraits):
         return line_plot
 
     def make_reference_plot(self):
+        ''' make reference plot for mini plot range selector'''
         x_pts = np.array([self.model.distance_array.min(),
                           self.model.distance_array.max()
                           ]
@@ -434,10 +477,23 @@ class PlotContainer(HasTraits):
 
     @on_trait_change('model')
     def update(self):
+        ''' make new vplot when a new survey line is selected'''
         self.create_vplot()
 
+    def zoom_all(self, obj, name, old, new):
+        low, high = obj.range.low, obj.range.high
+        for key, hpc in self.hplot_dict.items():
+            if key != 'mini':
+                vmapper = hpc.components[0].value_mapper
+                if vmapper.range.low != low:
+                    vmapper.range.low = low
+                if vmapper.range.high != high:
+                    vmapper.range.high = high
+
     def _range_selection_handler(self, event):
-        # The event obj should be a tuple (low, high) in data space
+        ''' updates the main plots when the range selector in the mini plot is
+        adjusted.  The event obj should be a tuple (low, high) in data space
+        '''
         if event is not None:
             #adjust index range for main plots
             low, high = event
@@ -473,29 +529,53 @@ class PlotContainer(HasTraits):
         img = hplot.components[0].plots[key][0]
 
         if slice_meta:    # set metadata and data
+
             # check hplot img meta != new meta. if !=, change it.
             # this will update tools for other frequencies
             this_meta = img.index.metadata
             if this_meta.get('x_slice', None) is not slice_meta:
                 this_meta.update({"x_slice": slice_meta})
 
-            # check if cursor is 'near' core, and set visibility in sliceplot
             x_index, y_index = slice_meta
-            abs_index = self.model.freq_trace_num[key][x_index]
-            x_pos = self.model.distance_array[abs_index]
+            try:
+                if x_index:
+                    # now updata data array which will updata slice plot
+                    slice_data = img.value.data[:, x_index]
+                    self.data.update_data({slice_key: slice_data})
+                else:
+                    self.data.update_data({slice_key: np.array([])})
+            except IndexError:
+                self.data.update_data({slice_key: np.array([])})
+
+            try:
+                # abs_index is the trace number for the selected image index
+                abs_index = self.model.freq_trace_num[key][x_index] - 1
+                x_pos = self.model.distance_array[abs_index]
+            except IndexError:
+                # if for some reason the tool returns a crazy index then bound
+                # it to array limits.
+                logger.info('cursor index out of bounds: value set to limit')
+                indices = self.model.freq_trace_num[key]-1
+                x_ind_max = indices.size - 1
+                x_ind_clipped = np.clip(x_index, 0, x_ind_max)
+                abs_index = indices[x_ind_clipped]
+                x_pos = self.model.distance_array[abs_index]
+
+            # check if cursor is 'near' core, and set visibility in sliceplot
             for core in self.model.core_samples:
+                # show core if cursor within range of core location
                 loc_index, loc, dist = self.model.core_info_dict[core.core_id]
                 core_plot_list = self.core_plots_dict[core.core_id]
                 for core_plot in core_plot_list:
-                    if np.abs(x_pos - loc) < CORE_VISIBILITY_CRITERIA:
-                        core_plot.visible = True
-                    else:
-                        core_plot.visible = False
-
-            # now updata data array which will updata slice plot
-            # try might not be necessary depending on inspect tool
-            slice_data = img.value.data[:, x_index]
-            self.data.update_data({slice_key: slice_data})
+                    try:
+                        if np.abs(x_pos - loc) < CORE_VISIBILITY_CRITERIA:
+                            core_plot.visible = True
+                        else:
+                            core_plot.visible = False
+                    except ValueError:
+                        debug = 'core dist check xpos,loc,abs(x-l)\n={},{},{}'
+                        absdiff = np.abs(x_pos-loc)
+                        logger.debug(debug.format(x_pos, loc, absdiff))
 
         else:   # clear all slice plots
             self.data.update_data({slice_key: np.array([])})
@@ -513,7 +593,11 @@ class PlotContainer(HasTraits):
         main.add(line)
         # then plot boundary layers as dots on line
         layer_depths = core.layer_boundaries
-        ref_depth = self.model.final_lake_depth.depth_array[loc_index]
+        ref_depth_line = self.model.get_ref_depth_line()
+        if ref_depth_line:
+            ref_depth = ref_depth_line.depth_array[loc_index]
+        else:
+            ref_depth = 0
         ys = ref_depth + layer_depths
         xs = ys * 0 + loc
         scatter = create_scatter_plot((xs, ys), color='darkgreen',
@@ -530,37 +614,35 @@ class PlotContainer(HasTraits):
         show_core_range'''
         x_range = slice_plot.index_range
         xs = np.array([x_range.low, x_range.high])
-        ref_depth = self.model.final_lake_depth.depth_array[loc_index]
+        ref_depth_line = self.model.get_ref_depth_line()
+        if ref_depth_line:
+            ref_depth = ref_depth_line.depth_array[loc_index]
+        else:
+            ref_depth = 0
+            
         for boundary in core.layer_boundaries:
             ys = xs * 0 + (ref_depth + boundary)
-            line = create_line_plot((xs, ys),  orientation='h',
+            line = create_line_plot((xs, ys), orientation='h',
                                     color='lightgreen', width=CORE_LINE_WIDTH)
             line.origin = 'top left'
             line.value_range = slice_plot.index_range
             self.core_plots_dict.setdefault(core.core_id, []).append(line)
             slice_plot.add(line)
 
+    def _img_colormap_changed(self):
+        ''' updates colormap in images when img_colormap changes'''
+        self._cmap = default_colormaps.color_map_name_dict[self.img_colormap]
+        for key, hpc in self.hplot_dict.items():
+            main = hpc.components[0]
+            if key == 'mini':
+                key = self.model.freq_choices[-1]
+            img_plot = main.plots[key][0]
+            if img_plot is not None:
+                value_range = img_plot.color_mapper.range
+                img_plot.color_mapper = self._cmap(value_range)
+            print 'redraw', key
+            main.invalidate_and_redraw()
 
-class AddDepthLineView(HasTraits):
-    ''' Defines popup window for adding new depthline'''
-
-    # depth line instance to be edited or displays
-    depth_line = Instance(DepthLine)
-
-    depth_line_name = Property()
-    # used in new depth line dialog box to apply choices to make a new line
-    apply_button = Button('Apply')
-
-    traits_view = View(
-        Group(Item('depth_line_name'),
-              'apply_button',
-              ),
-        buttons=['OK', 'Cancel'],
-        resizable=True
-        )
-
-    def _get_depth_line_name(self):
-        return self.depth_line.name
 
 class ControlView(HasTraits):
     ''' Define controls and info subview with size control'''
@@ -576,13 +658,13 @@ class ControlView(HasTraits):
 
     traits_view = View(
         HGroup(
+            UItem('edit',
+                  tooltip='Toggle between "not editing" and \
+                          "editing" selected line'
+                  ),
             Item('line_to_edit',
                  editor=EnumEditor(name='target_choices'),
                  tooltip='Edit red line with right mouse button'
-                 ),
-            Item('edit',
-                 tooltip='Toggle between "not editing" and \
-                          "editing" selected line'
                  ),
             ),
         resizable=True
@@ -609,8 +691,9 @@ class ImageAdjustView(HasTraits):
         Item('contrast',
              editor=RangeEditor(low=1.0, high=CONTRAST_MAX), label='C'),
         Item('invert'),
-        resizable=True
-        )
+        resizable=True,
+        kind='livemodal'
+    )
 
     def _get_contrast_brightness(self):
         return (self.contrast, self.brightness)
@@ -647,6 +730,7 @@ class HPlotSelectionView(HasTraits):
                              ),
                        Label('Show Intensity Profiles'),
                        UItem('intensity_profile'),
+                       kind='modal',
                        resizable=True
                        )
 
@@ -681,7 +765,16 @@ class DataView(HasTraits):
         Item('power'),
         Item('gain'),
         resizable=True
-        )
+    )
+
+
+class MsgView(HasTraits):
+    msg = Str('my msg')
+    traits_view = View(Item('msg', editor=TextEditor(), style='custom'),
+                       buttons=['OK', 'Cancel'],
+                       kind='modal',
+                       resizable=True
+                       )
 
 
 if __name__ == '__main__':
