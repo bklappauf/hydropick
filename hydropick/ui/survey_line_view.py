@@ -86,8 +86,8 @@ class SurveyLineView(ModelView):
     # Custom tool for showing depth values at mouse position for each freq
     depth_tools = Dict
 
-    lake_depth_choices = Property(depends_on='model.lake_depths')
-    preimpoundment_depth_choices = Property(depends_on='model.preimpoundment_depths')
+    # lake_depth_choices = Property(depends_on='model.lake_depths')
+   # preimpoundment_depth_choices = Property(depends_on='model.preimpoundment_depths')
     #==========================================================================
     # Define Views
     #==========================================================================
@@ -102,9 +102,9 @@ class SurveyLineView(ModelView):
 
     final_depth_view = View(
         Label('View or Set current final depth line choices for this survey line'),
-        Item('model.final_lake_depth', editor=EnumEditor(name='lake_depth_choices')),
+        Item('model.final_lake_depth', editor=EnumEditor(name='model.lake_depth_choices')),
         Item('model.final_preimpoundment_depth',
-             editor=EnumEditor(name='preimpoundment_depth_choices')),
+             editor=EnumEditor(name='model.preimpoundment_depth_choices')),
         resizable=True
     )
 
@@ -300,7 +300,8 @@ class SurveyLineView(ModelView):
         
     def show_final_depth_line_dialog(self):
         print 'setting final view'
-        self.configure_traits(view="final_depth_view")
+        print self.model.lake_depths.keys(), self.model.lake_depth_choices
+        self.configure_traits(view="final_depth_view", context={'model':self.model})
 
     def cmap_edit_dialog(self):
         ''' brings up cmap edit dialog. close to continue'''

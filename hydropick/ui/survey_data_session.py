@@ -99,6 +99,7 @@ class SurveyDataSession(HasTraits):
     
     @on_trait_change('target_choices')
     def update_choices(self):
+        print 'target choices changed- get depth choices'
         if isinstance(self.lake_depths, dict):
             self.lake_depth_choices = self.lake_depths.keys()
         else:
@@ -257,6 +258,7 @@ class SurveyDataSession(HasTraits):
         ''' Get list of available frequencies as strings from frequencies dic
         limit resolution to 0.1 kHz.
         '''
+        self.update_choices()
         return self.depth_dict.keys()
 
     def _get_xbounds(self):
