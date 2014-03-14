@@ -12,16 +12,17 @@ import logging
 import numpy as np
 
 # ETS imports
-from traits.api import (Instance, Str, Property, HasTraits, Int, List,
+from traits.api import (Instance, Event, Str, Property, HasTraits, Int, List,
                         on_trait_change, Button, Bool, Supports, Dict)
 from traitsui.api import (View, VGroup, HGroup, Item, UItem, EnumEditor,
-                          TextEditor, ListEditor)
+                          TextEditor, ListEditor, ButtonEditor)
 
 # Local imports
 from ..model.depth_line import DepthLine
 from ..model.i_survey_line_group import ISurveyLineGroup
 from ..model.i_survey_line import ISurveyLine
 from ..model.i_algorithm import IAlgorithm
+from .algorithm_presenter import AlgorithmPresenter
 from .survey_data_session import SurveyDataSession
 from .survey_views import MsgView
 
@@ -116,11 +117,15 @@ class DepthLineView(HasTraits):
     apply_to_group = Button('Apply to Group')
 
     # button to open algorithm configure dialog
-    configure_algorithm = Button('Configure Algorithm')
+    configure_algorithm = Event()
     configure_algorithm_done = Button('Configure Algorithm (Done)')
     
     # flag to prevent source_name listener from acting when model changes
     model_just_changed = Bool(True)
+
+    # Private algorithm presenter initialized at creation time
+    _algorithm_presenter = Instance(AlgorithmPresenter, ())
+
     #==========================================================================
     # Define Views
     #==========================================================================
@@ -145,6 +150,7 @@ class DepthLineView(HasTraits):
                     editor=EnumEditor(name='source_names')),
 
                UItem('configure_algorithm',
+                     editor=ButtonEditor(label='Configure Algorithm'),
                      visible_when=('object.model.source=="algorithm" and not current_algorithm')
                      ),
                UItem('configure_algorithm_done',
@@ -199,7 +205,9 @@ class DepthLineView(HasTraits):
                      .format(alg_name, self.current_algorithm, self.model.args))
         if self.current_algorithm is None:
             self.set_current_algorithm()
-        self.current_algorithm.configure_traits()
+
+        self._algorithm_presenter.algorithm = self.current_algorithm
+        self._algorithm_presenter.edit_traits()
 
     def set_alg_args(self, model_args):
         ''' if possible, sets default arguments for current algorithm configure

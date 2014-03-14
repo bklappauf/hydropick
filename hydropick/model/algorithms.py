@@ -16,7 +16,6 @@ from __future__ import absolute_import
 import numpy as np
 
 from traits.api import provides, Str, HasTraits, Float
-from traitsui.api import View, Item, TextEditor, Group, UItem, Label
 
 from .i_algorithm import IAlgorithm
 
@@ -28,27 +27,7 @@ ALGORITHM_LIST = [
 ]
 
 
-def create_view(instructions, *args):
-    ''' creates a default configuration dialog view for the user to read what
-    the algorithm does, and if arguments, what they are, and widgits to set
-    them.
-    The instructions will be printed readonly at the top of the dialog.
-    The arguments will be stacked vertically below using their default editors
-    Creator of an algorith can use this as a model to override the configure
-    dialog by setting the traits_view trait to a View object similar to this
-    '''
 
-    view = View(Group(
-                Label('Instructions:', emphasized=True),
-                UItem('instructions', editor=TextEditor(), style='readonly',
-                      emphasized=True)
-                ),
-                Item('_'),
-                *args,
-                buttons=['OK', 'Cancel'],
-                kind='modal'
-                )
-    return view
 
 
 @provides(IAlgorithm)
@@ -76,9 +55,6 @@ class ZeroAlgorithm(HasTraits):
         zeros_array = np.zeros_like(trace_array)
         return trace_array, zeros_array
 
-    traits_view = create_view(instructions, *arglist)
-
-
 @provides(IAlgorithm)
 class OnesAlgorithm(HasTraits):
     """ A default algorithm for testing or hand drawing a new line
@@ -103,9 +79,6 @@ class OnesAlgorithm(HasTraits):
         trace_array = survey_line.trace_num
         depth_array = np.ones_like(trace_array)
         return trace_array, depth_array
-
-    traits_view = create_view(instructions, *arglist)
-
 
 @provides(IAlgorithm)
 class XDepthAlgorithm(HasTraits):
@@ -136,5 +109,3 @@ class XDepthAlgorithm(HasTraits):
         trace_array = survey_line.trace_num
         depth_array = depth * np.ones_like(trace_array)
         return trace_array, depth_array
-
-    traits_view = create_view(instructions, *arglist)
