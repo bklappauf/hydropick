@@ -361,11 +361,7 @@ class SurveyTask(Task):
         return Survey(name='New Survey')
 
     def _algorithms_default(self):
-        name_list = algorithms.ALGORITHM_LIST
-        classes = [getattr(algorithms, cls_name) for cls_name in name_list]
-        names = [cls().name for cls in classes]
-        logger.debug('found these algorithms: {}'.format(names))
-        return dict(zip(names, classes))
+        return algorithms.get_algorithm_dict()
 
     ###########################################################################
     # private interface.

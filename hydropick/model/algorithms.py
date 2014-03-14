@@ -12,6 +12,7 @@ string or it will not be recognized.
 """
 
 from __future__ import absolute_import
+import logging
 
 import numpy as np
 
@@ -19,15 +20,14 @@ from traits.api import provides, Str, HasTraits, Float
 
 from .i_algorithm import IAlgorithm
 
+logger = logging.getLogger(__name__)
+
 
 ALGORITHM_LIST = [
     'ZeroAlgorithm',
     'OnesAlgorithm',
     'XDepthAlgorithm'
 ]
-
-
-
 
 
 @provides(IAlgorithm)
@@ -109,3 +109,11 @@ class XDepthAlgorithm(HasTraits):
         trace_array = survey_line.trace_num
         depth_array = depth * np.ones_like(trace_array)
         return trace_array, depth_array
+
+
+def get_algorithm_dict():
+    name_list = ALGORITHM_LIST
+    classes = [globals()[cls_name] for cls_name in name_list]
+    names = [cls().name for cls in classes]
+    logger.debug('found these algorithms: {}'.format(names))
+    return dict(zip(names, classes))

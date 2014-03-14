@@ -12,7 +12,7 @@ import logging
 import numpy as np
 
 # ETS imports
-from traits.api import (Instance, Event, Str, Property, HasTraits, Int, List,
+from traits.api import (Instance, Event, Str, Property, HasStrictTraits, Int, List,
                         on_trait_change, Button, Bool, Supports, Dict)
 from traitsui.api import (View, VGroup, HGroup, Item, UItem, EnumEditor,
                           TextEditor, ListEditor, ButtonEditor)
@@ -35,7 +35,7 @@ APPLY_TOOLTIP = \
     'applies current setting to line, but does not update data'
 
 
-class DepthLineView(HasTraits):
+class DepthLineView(HasStrictTraits):
     """ View Class for working with survey line data to find depth profile.
 
     Uses a Survey class as a model and allows for viewing of various depth
@@ -96,7 +96,7 @@ class DepthLineView(HasTraits):
 
     # dict of algorithms
     algorithms = Dict
-    
+
     # convenience property for getting algorithm arguments
     alg_arg_dict = Property()
 
@@ -236,7 +236,7 @@ class DepthLineView(HasTraits):
                 logger.debug('updating model with args {}'.format(self.alg_arg_dict))
                 self.model.args = self.alg_arg_dict
                 self.zero_out_array_data()
-            
+
 
     @on_trait_change('new_button')
     def load_new_blank_line(self):
@@ -679,3 +679,24 @@ class DepthLineView(HasTraits):
             num_lines = 0
         # return [group_string] + ['LINES: {}'.format(num_lines)] + all_lines
         return ['LINES: {}'.format(num_lines)] + all_lines
+
+
+if __name__ == '__main__':
+
+
+
+    from .tests.utils import get_data_session
+
+    session = get_data_session()
+    depth_line = session.lake_depths[session.lake_depths.keys()[0]]
+
+    from hydropick.model import algorithms
+    algo_dict = algorithms.get_algorithm_dict()
+
+    #FIXME: we have set the algorithms at two different places.
+    session.algorithms = algo_dict
+
+    view = DepthLineView(
+        data_session=session, model=depth_line, algorithms=algo_dict
+    )
+    view.configure_traits()
