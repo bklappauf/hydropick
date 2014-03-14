@@ -140,21 +140,30 @@ class TraceTool(BaseTool):
         Find linear interpolation for each array point inbetween current mouse
         position and previously captured position.
         """
-        diff = np.absolute(current_index - self.last_index)
-        if diff > 1:
-            start = min(current_index, self.last_index)
-            end = start + diff + 1
-            xpts = [start, end]
-            ypts = [self.last_y, newy]
+        diff = current_index - self.last_index
+        if np.absolute(diff) > 1:
+            # start = min(current_index, self.last_index)
+            # end = start + diff + 1
+            # xpts = [start, end]
+            #
+            if diff < 0:
+                xpts = [current_index, self.last_index + 1]
+                ypts = [newy, self.last_y]
+            else:
+                xpts = [self.last_index, current_index + 1]
+                ypts = [self.last_y, newy]
             indices = range(*xpts)
             ys = np.interp(indices, xpts, ypts)
+
         else:
             indices = [current_index]
             ys = [newy]
+        print 'fill ind, ys', indices, ys
         return np.array(indices), np.array(ys)
 
     def normal_mouse_move(self, event):
         newx, newy = self.component.map_data((event.x, event.y))
+        print newx, newy
         self.depth = newy
 
     def edit_mouse_move(self, event):
@@ -177,13 +186,21 @@ class TraceTool(BaseTool):
 
             if self.mouse_down:
                 ydata = target.value.get_data()
+                print 'ind,newy',current_index, newx, newy, xdata
                 indices, ys = self.fill_in_missing_pts(current_index,
                                                        newy, ydata)
+                print indices, ys, indices.dtype, ys.dtype
                 ydata[indices] = ys
                 data_key = self.key + '_y'
                 self.data.set_data(data_key, ydata)
-                self.last_index = indices[-1]
-                self.last_y = ys[-1]
+                if self.last_index < indices[-1]:
+                    # moved right
+                    self.last_index = indices[-1]
+                    self.last_y = ys[-1]
+                else:
+                    # moved left
+                    self.last_index = indices[0]
+                    self.last_y = ys[0]
 
             else:
                 # save this mouse position as reference for further moves while
