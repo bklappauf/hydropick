@@ -683,26 +683,11 @@ class DepthLineView(HasStrictTraits):
 
 if __name__ == '__main__':
 
-    import os
-    import tempfile
-    from hydropick.io.import_survey import import_sdi, import_cores
 
-    data_dir = 'SurveyData'
-    survey_name = '12030221'
-    tempdir = tempfile.mkdtemp()
-    h5file = os.path.join(tempdir, 'test.h5')
 
-    test_dir = os.path.dirname(__file__)
-    data_path = os.path.join(test_dir, 'tests', data_dir)
-    lines, groups, _, _ = import_sdi(data_path, h5file)
-    core_samples = import_cores(os.path.join(data_path, 'Coring'), h5file)
-    for line in lines:
-        if line.name == survey_name:
-            survey_line = line
-            survey_line.core_samples = core_samples
-    survey_line.load_data(h5file)
-    session = SurveyDataSession(survey_line=survey_line)
+    from tests.utils import get_data_session
 
+    session = get_data_session()
     depth_line = session.lake_depths[session.lake_depths.keys()[0]]
 
     from hydropick.model import algorithms
