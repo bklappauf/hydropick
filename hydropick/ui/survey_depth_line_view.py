@@ -12,7 +12,7 @@ import logging
 import numpy as np
 
 # ETS imports
-from traits.api import (Instance, Event, Str, Property, HasTraits, Int, List,
+from traits.api import (Instance, Event, Str, Property, HasStrictTraits, Int, List,
                         on_trait_change, Button, Bool, Supports, Dict)
 from traitsui.api import (View, VGroup, HGroup, Item, UItem, EnumEditor,
                           TextEditor, ListEditor, ButtonEditor)
@@ -35,7 +35,7 @@ APPLY_TOOLTIP = \
     'applies current setting to line, but does not update data'
 
 
-class DepthLineView(HasTraits):
+class DepthLineView(HasStrictTraits):
     """ View Class for working with survey line data to find depth profile.
 
     Uses a Survey class as a model and allows for viewing of various depth
@@ -96,7 +96,7 @@ class DepthLineView(HasTraits):
 
     # dict of algorithms
     algorithms = Dict
-    
+
     # convenience property for getting algorithm arguments
     alg_arg_dict = Property()
 
@@ -236,7 +236,7 @@ class DepthLineView(HasTraits):
                 logger.debug('updating model with args {}'.format(self.alg_arg_dict))
                 self.model.args = self.alg_arg_dict
                 self.zero_out_array_data()
-            
+
 
     @on_trait_change('new_button')
     def load_new_blank_line(self):
@@ -679,3 +679,39 @@ class DepthLineView(HasTraits):
             num_lines = 0
         # return [group_string] + ['LINES: {}'.format(num_lines)] + all_lines
         return ['LINES: {}'.format(num_lines)] + all_lines
+
+
+if __name__ == '__main__':
+
+    import os
+    import tempfile
+    from hydropick.io.import_survey import import_sdi, import_cores
+
+    data_dir = 'SurveyData'
+    survey_name = '12030221'
+    tempdir = tempfile.mkdtemp()
+    h5file = os.path.join(tempdir, 'test.h5')
+
+    test_dir = os.path.dirname(__file__)
+    data_path = os.path.join(test_dir, 'tests', data_dir)
+    lines, groups, _, _ = import_sdi(data_path, h5file)
+    core_samples = import_cores(os.path.join(data_path, 'Coring'), h5file)
+    for line in lines:
+        if line.name == survey_name:
+            survey_line = line
+            survey_line.core_samples = core_samples
+    survey_line.load_data(h5file)
+    session = SurveyDataSession(survey_line=survey_line)
+
+    depth_line = session.lake_depths[session.lake_depths.keys()[0]]
+
+    from hydropick.model import algorithms
+    algo_dict = algorithms.get_algorithm_dict()
+
+    #FIXME: we have set the algorithms at two different places.
+    session.algorithms = algo_dict
+
+    view = DepthLineView(
+        data_session=session, model=depth_line, algorithms=algo_dict
+    )
+    view.configure_traits()
