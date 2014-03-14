@@ -685,7 +685,7 @@ if __name__ == '__main__':
 
 
 
-    from tests.utils import get_data_session
+    from .tests.utils import get_data_session
 
     session = get_data_session()
     depth_line = session.lake_depths[session.lake_depths.keys()[0]]
