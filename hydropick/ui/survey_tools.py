@@ -114,6 +114,11 @@ class TraceTool(BaseTool):
     # line key for this depth line.  from depth_dict, label data in data obj
     key = Str
 
+    data_changed = Bool(False)
+
+    def _target_line_changed(self):
+        self.data_changed = False
+
     def _get_data(self):
         return self.target_line.container.data
 
@@ -128,11 +133,6 @@ class TraceTool(BaseTool):
         ''' finish editing'''
         self.event_state = 'normal'
         self.mouse_down = False
-
-    # def edit_key_pressed(self, event):
-    #     ''' reset '''
-    #     if event.character == "Esc":
-    #         self._reset()
 
     def fill_in_missing_pts(self, current_index, newy, ydata):
         """ Fill in missing points if mouse goes to fast to capture all
@@ -158,12 +158,10 @@ class TraceTool(BaseTool):
         else:
             indices = [current_index]
             ys = [newy]
-        print 'fill ind, ys', indices, ys
         return np.array(indices), np.array(ys)
 
     def normal_mouse_move(self, event):
         newx, newy = self.component.map_data((event.x, event.y))
-        print newx, newy
         self.depth = newy
 
     def edit_mouse_move(self, event):
@@ -186,13 +184,12 @@ class TraceTool(BaseTool):
 
             if self.mouse_down:
                 ydata = target.value.get_data()
-                print 'ind,newy',current_index, newx, newy, xdata
                 indices, ys = self.fill_in_missing_pts(current_index,
                                                        newy, ydata)
-                print indices, ys, indices.dtype, ys.dtype
                 ydata[indices] = ys
                 data_key = self.key + '_y'
                 self.data.set_data(data_key, ydata)
+                self.data_changed = True
                 if self.last_index < indices[-1]:
                     # moved right
                     self.last_index = indices[-1]

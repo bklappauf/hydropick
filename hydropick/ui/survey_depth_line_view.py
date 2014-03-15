@@ -119,7 +119,7 @@ class DepthLineView(HasStrictTraits):
     # button to open algorithm configure dialog
     configure_algorithm = Event()
     configure_algorithm_done = Button('Configure Algorithm (Done)')
-    
+
     # flag to prevent source_name listener from acting when model changes
     model_just_changed = Bool(True)
 
@@ -254,6 +254,7 @@ class DepthLineView(HasStrictTraits):
     def update_arrays(self, new):
         ''' apply chosen method to fill line arrays
         '''
+        self.no_problem = True
         logger.info('applying arrays update')
         model = self.model
         if model.lock:
@@ -265,7 +266,7 @@ class DepthLineView(HasStrictTraits):
             self.check_if_name_already_exists(model)
 
         if self.no_problem:
-            logger.debug('no problem in update. try update')
+            logger.debug('trying update')
             line = self.data_session.survey_line
             # name valid.  Try to update data.
             if model.source == 'algorithm':
@@ -287,14 +288,13 @@ class DepthLineView(HasStrictTraits):
                 # source is sdi line.  create only from sdi data
                 s = 'source "sdi" only available at survey load'
                 self.log_problem(s)
-                self.no_problem = True
 
             if self.no_problem:
                 self.check_arrays()
-                self.no_problem = True
-            else:
-                # allow user to correct problems and continue
-                self.no_problem = True
+            if self.no_problem:
+                self.model.edited = False
+            # allow user to correct problems and continue
+            self.no_problem = True
         else:
             # allow user to correct problems and continue
             self.no_problem = True
@@ -311,7 +311,6 @@ class DepthLineView(HasStrictTraits):
         # or selected is none ( => new line)
         # check that name is if name is taken that line is not locked.
         name = self.selected_depth_line_name.split('_')[1:]
-        print 'check name', self.model.name, name, ''.join(name)
         if self.model.name != ''.join(name):
             self.check_if_name_already_exists(model)
         if model.lock:
@@ -506,12 +505,13 @@ class DepthLineView(HasStrictTraits):
         alg_choices = self.algorithms.keys()
         good_alg_name = self.model.source_name in alg_choices
         if not_alg or not good_alg_name:
-            self.log_problem('must select valid algorithm')
+            self.log_problem('Invalid algorithm! Application Problem')
         else:
             self.no_problem = True
-        self.set_current_algorithm()
+            self.set_current_algorithm()
         # check that arguments match model. Otherwise these need to be set.
-        self.check_args()
+        if self.no_problem:
+            self.check_args()
 
     def check_args(self):
         ''' checks that arguments match the model
@@ -528,7 +528,7 @@ class DepthLineView(HasStrictTraits):
             #     self.log_problem(s)
             if not tst:
                 s = 'arguments do not match - please configure algorithm.'
-                self.log_problem(s) 
+                self.log_problem(s)
 
     ############################################################
     def set_current_algorithm(self):
@@ -548,7 +548,7 @@ class DepthLineView(HasStrictTraits):
         ''' sets depth and index arrays for model to zero'''
         self.model.index_array = np.array([])
         self.model.depth_array = np.array([])
-        
+
     def update_plot(self):
         ''' used as signal to update depth line choices from depth_lines prop
         so that ui choices will update'''
@@ -611,7 +611,7 @@ class DepthLineView(HasStrictTraits):
         else:
             d = {}
         return d
-    
+
     def _get_source_names(self):
         source = self.model.source
         if source == 'algorithm':

@@ -71,7 +71,7 @@ class SurveyLineView(ModelView):
 
     # Defines view for pop up image adjustments window
     cmap_edit_view = Instance(ColormapEditView)
-    
+
     # Defines view for pop up window for  survey line settings
     line_settings_view = Instance(LineSettingsView)
 
@@ -143,7 +143,7 @@ class SurveyLineView(ModelView):
 
     def _data_view_default(self):
         return DataView()
-    
+
     def _line_settings_view_default(self):
         return self.update_line_settings_view()
 
@@ -207,7 +207,7 @@ class SurveyLineView(ModelView):
         else:
             view = LineSettingsView()
         return view
-    
+
     def message(self, msg='my message'):
         dialog = MsgView(msg=msg)
         dialog.configure_traits()
@@ -241,7 +241,7 @@ class SurveyLineView(ModelView):
                       slice_key: np.array([]),
                       }
                 d.update_data(**kw)
-            
+
             # add zoom box points for showing zoom box in mini
             # x = 1000
             # y = 4
@@ -316,7 +316,7 @@ class SurveyLineView(ModelView):
     def plot_view_selection_dialog(self):
         ''' called from view menu to edit which plots to view'''
         self.plot_selection_view.configure_traits()
-        
+
     def line_settings_dialog(self):
         ''' called from view menu to edit which plots to view'''
         self.line_settings_view.configure_traits()
@@ -422,6 +422,7 @@ class SurveyLineView(ModelView):
             self.control_view.edit = 'Not Editing'
 
         # change colors and tool tgt for each freq plot
+        edited = []
         for key in self.model.freq_choices:
             # if new tgt, change its color, else set none
             if new_target != 'None':
@@ -439,12 +440,16 @@ class SurveyLineView(ModelView):
                 old_target_plot.color = old_color
             # update trace_tool target for this freq.
             tool = self.trace_tools[key]
+            edited.append(tool.data_changed)
             tool.target_line = new_target_plot
             tool.key = new_target
 
         if AUTOSAVE_EDIT_ON_CHANGE and old_target_plot:
             edited_data = old_target_plot.value.get_data()
             old_target_depth_line.depth_array = edited_data
+            if old_target_depth_line.edited == False:
+                # never edited so set to edited if and tool has edited it.
+                old_target_depth_line.edited = any(edited)
 
         self.plot_container.vplot_container.invalidate_and_redraw()
 
