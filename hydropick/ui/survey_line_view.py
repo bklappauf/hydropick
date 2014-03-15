@@ -20,7 +20,7 @@ from chaco.api import (ArrayPlotData)
 from .survey_data_session import SurveyDataSession
 from .survey_tools import TraceTool, LocationTool, DepthTool
 from .survey_views import (ControlView, InstanceUItem, PlotContainer, DataView,
-                           ImageAdjustView, MsgView,
+                           ImageAdjustView, MsgView, LineSettingsView,
                            HPlotSelectionView, ColormapEditView)
 
 logger = logging.getLogger(__name__)
@@ -71,6 +71,9 @@ class SurveyLineView(ModelView):
 
     # Defines view for pop up image adjustments window
     cmap_edit_view = Instance(ColormapEditView)
+
+    # Defines view for pop up window for  survey line settings
+    line_settings_view = Instance(LineSettingsView)
 
     ######## SAVE FOR NOW - MAY GO BACK TO THIS ########
     # List of which lines are visible in plots
@@ -141,6 +144,9 @@ class SurveyLineView(ModelView):
     def _data_view_default(self):
         return DataView()
 
+    def _line_settings_view_default(self):
+        return self.update_line_settings_view()
+
     def _cmap_edit_view_default(self):
         return ColormapEditView()
 
@@ -193,6 +199,15 @@ class SurveyLineView(ModelView):
     #==========================================================================
     # Helper functions
     #==========================================================================
+
+    def update_line_settings_view(self):
+        ''' called by default method or by model update notification'''
+        if self.model:
+            view = LineSettingsView(model=self.model)
+        else:
+            view = LineSettingsView()
+        return view
+
     def message(self, msg='my message'):
         dialog = MsgView(msg=msg)
         dialog.configure_traits()
@@ -226,7 +241,7 @@ class SurveyLineView(ModelView):
                       slice_key: np.array([]),
                       }
                 d.update_data(**kw)
-            
+
             # add zoom box points for showing zoom box in mini
             # x = 1000
             # y = 4
@@ -235,8 +250,6 @@ class SurveyLineView(ModelView):
 
             # add the depth line data
             for line_key, depth_line in self.model.depth_dict.items():
-                indices = depth_line.index_array
-                print len(indices), indices.max(), indices
                 x = self.model.distance_array[depth_line.index_array]
                 y = depth_line.depth_array
                 key_x, key_y = line_key + '_x',  line_key + '_y'
@@ -271,6 +284,7 @@ class SurveyLineView(ModelView):
         # need to call tools to activate defaults
         start_tools = self.location_tools
         start_tools = self.depth_tools
+        self.line_settings_view = self.update_line_settings_view()
         c.vplot_container.invalidate_and_redraw()
 
     def update_control_view(self):
@@ -302,6 +316,10 @@ class SurveyLineView(ModelView):
     def plot_view_selection_dialog(self):
         ''' called from view menu to edit which plots to view'''
         self.plot_selection_view.configure_traits()
+
+    def line_settings_dialog(self):
+        ''' called from view menu to edit which plots to view'''
+        self.line_settings_view.configure_traits()
 
     ############## other handlers/notifiers  #################
 
@@ -404,6 +422,7 @@ class SurveyLineView(ModelView):
             self.control_view.edit = 'Not Editing'
 
         # change colors and tool tgt for each freq plot
+        edited = []
         for key in self.model.freq_choices:
             # if new tgt, change its color, else set none
             if new_target != 'None':
@@ -421,12 +440,16 @@ class SurveyLineView(ModelView):
                 old_target_plot.color = old_color
             # update trace_tool target for this freq.
             tool = self.trace_tools[key]
+            edited.append(tool.data_changed)
             tool.target_line = new_target_plot
             tool.key = new_target
 
         if AUTOSAVE_EDIT_ON_CHANGE and old_target_plot:
             edited_data = old_target_plot.value.get_data()
             old_target_depth_line.depth_array = edited_data
+            if old_target_depth_line.edited == False:
+                # never edited so set to edited if and tool has edited it.
+                old_target_depth_line.edited = any(edited)
 
         self.plot_container.vplot_container.invalidate_and_redraw()
 

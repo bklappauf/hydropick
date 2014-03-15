@@ -168,6 +168,9 @@ class SurveyTask(Task):
                     CentralPaneAction(name='Change Colormap',
                                method='on_change_colormap',
                                enabled_name='show_view'),
+                    CentralPaneAction(name='Survey Line Settings',
+                               method='on_change_settings',
+                               enabled_name='show_view'),
                     CentralPaneAction(name='Cursor Freeze Key = Alt+c',
                                method='on_cursor_freeze',
                                enabled_name='show_view'),
@@ -358,11 +361,7 @@ class SurveyTask(Task):
         return Survey(name='New Survey')
 
     def _algorithms_default(self):
-        name_list = algorithms.ALGORITHM_LIST
-        classes = [getattr(algorithms, cls_name) for cls_name in name_list]
-        names = [cls().name for cls in classes]
-        logger.debug('found these algorithms: {}'.format(names))
-        return dict(zip(names, classes))
+        return algorithms.get_algorithm_dict()
 
     ###########################################################################
     # private interface.

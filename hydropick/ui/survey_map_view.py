@@ -13,7 +13,7 @@ from shapely.geometry import Point
 
 # ETS imports
 from chaco.api import (ArrayPlotData, ArrayDataSource, LinearMapper,
-                       Plot, PolygonPlot, ScatterPlot)
+                       Plot, PolygonPlot, ScatterPlot, TextBoxOverlay)
 from chaco.tools.api import PanTool, ZoomTool
 from enable.api import BaseTool, ColorTrait
 from traits.api import Bool, Dict, Float, Instance, List, on_trait_change, Property
@@ -25,6 +25,46 @@ from hydropick.model.i_survey import ISurvey
 from hydropick.model.i_survey_line import ISurveyLine
 from hydropick.ui.line_select_tool import LineSelectTool
 
+# Constants for easy custumization of map view
+# Colors are strings like 'blue' for string tuples like '(0, 0 ,255)'
+# line styles are strings: 'solid', 'dot dash', 'dash', 'dot', 'long dash'
+# line widths are floats
+
+LAKE_COLOR = 'lightblue'
+#: Color to draw the land
+# XXX: This cannot be an arbitrary tuple, must be in enable.colors.color_table
+LAND_COLOR = 'wheat'
+SHORE_COLOR = 'black'
+CORE_COLOR = 'red'
+
+# attributes for lines niether approved nor selected nor current (ie default)
+PENDING_LINE_COLOR = 'blue'
+PENDING_LINE_WIDTH = 1.0
+PENDING_LINE_STYLE = 'solid'
+
+# selected line attributes (multiple lines selected by group or manually)
+SELECTED_LINE_COLOR = 'green'
+SELECTED_LINE_WIDTH = 1.0
+SELECTED_LINE_STYLE = 'solid'
+
+# current line attributes (line being edited: one only)
+CURRENT_LINE_COLOR = 'red'
+CURRENT_LINE_WIDTH = 2.0
+CURRENT_LINE_STYLE = 'solid'
+
+# status attributes (applied after selected or current)
+BAD_LINE_STYLE = 'dot'
+BAD_LINE_WIDTH = 1.0
+BAD_LINE_COLOR = 'grey'
+
+APPROVED_LINE_STYLE = 'dash'
+APPROVED_LINE_WIDTH = 1.0
+APPROVED_LINE_COLOR = 'black'
+
+# controls display of current survey line name in map view
+TEXTBOX_COLOR = 'red'
+TEXTBOX_POSITION = 'ul'
+TEXTBOX_BG_COLOR = 'white'
 
 class MapPlot(Plot):
     """ A subclass of Plot to allow setting of x- and y- scale to be constant.
@@ -68,6 +108,7 @@ class MapPlot(Plot):
             self.index_mapper.range.low = x_min_new
         self.aspect_ratio_set = True
 
+
 class SurveyMapView(ModelView):
     """ View Class for working with survey line data to find depth profile.
 
@@ -79,6 +120,23 @@ class SurveyMapView(ModelView):
 
     #: Survey lines
     survey_lines = Property(List)
+
+    bad_lines = Property(List)
+    approved_lines = Property(List)
+
+    def _get_bad_lines(self):
+        bad = []
+        for line in self.survey_lines:
+            if line.status == 'bad':
+                bad.append(line.name)
+        return bad
+
+    def _get_approved_lines(self):
+        approved = []
+        for line in self.survey_lines:
+            if line.status == 'approved':
+                approved.append(line.name)
+        return approved
 
     def _get_survey_lines(self):
         return self.model.survey_lines
@@ -99,38 +157,54 @@ class SurveyMapView(ModelView):
     #: reference to the task's selected survey lines
     selected_survey_lines = List(Instance(ISurveyLine))
 
-    @on_trait_change('current_survey_line, selected_survey_lines')
+    @on_trait_change('current_survey_line, selected_survey_lines, bad_lines')
     def _set_line_colors(self):
         for name, plot in self.line_plots.iteritems():
             lp = plot[0]
-            if self.current_survey_line and name == self.current_survey_line.name:
+            if self.current_survey_line and \
+                                    (name == self.current_survey_line.name):
                 lp.color = self.current_line_color
+                lp.line_width = CURRENT_LINE_WIDTH
+                lp.line_style = CURRENT_LINE_STYLE
             elif name in [line.name for line in self.selected_survey_lines]:
                 lp.color = self.selected_line_color
+                lp.line_width = SELECTED_LINE_WIDTH
+                lp.line_style = SELECTED_LINE_STYLE
             else:
                 lp.color = self.line_color
+            if name in self.bad_lines:
+                lp.line_style = BAD_LINE_STYLE
+                lp.line_width = BAD_LINE_WIDTH
+                lp.color = BAD_LINE_COLOR
+            elif name in self.approved_lines:
+                lp.line_style = APPROVED_LINE_STYLE
+                lp.line_width = APPROVED_LINE_WIDTH
+                lp.color = APPROVED_LINE_COLOR
 
     #: Color to draw the lake
-    lake_color = ColorTrait('lightblue')
+    lake_color = ColorTrait(LAKE_COLOR)
 
     #: Color to draw the land
     # XXX: This cannot be an arbitrary tuple, must be in enable.colors.color_table
-    land_color = ColorTrait('wheat')
+    land_color = ColorTrait(LAND_COLOR)
 
     #: Color to draw the shoreline
-    shore_color = ColorTrait('black')
+    shore_color = ColorTrait(SHORE_COLOR)
 
     #: Color to draw the core locations
-    core_color = ColorTrait('red')
+    core_color = ColorTrait(CORE_COLOR)
 
     #: Color to draw the survey lines
-    line_color = ColorTrait('blue')
+    line_color = ColorTrait(PENDING_LINE_COLOR)
 
     #: Color to draw the selected survey lines
-    selected_line_color = ColorTrait('green')
+    selected_line_color = ColorTrait(SELECTED_LINE_COLOR)
 
     #: Color to draw the survey lines
-    current_line_color = ColorTrait('red')
+    current_line_color = ColorTrait(CURRENT_LINE_COLOR)
+
+    #: text overlay to see names of clicked lines (mouseover may be better)
+    text_overlay = Instance(TextBoxOverlay)
 
     #: The Chaco plot object
     plot = Instance(Plot)
@@ -174,7 +248,9 @@ class SurveyMapView(ModelView):
             plotdata.set_data(x_key, x)
             plotdata.set_data(y_key, y)
             self.line_plots[line.name] = plot.plot((x_key, y_key),
-                                                   color=self.line_color)
+                                                color=self.line_color,
+                                                line_width=PENDING_LINE_WIDTH,
+                                                line_style=PENDING_LINE_STYLE)
         for core in self.model.core_samples:
             x, y = core.location
             scatterplot = ScatterPlot(index=ArrayDataSource([x]),
@@ -200,6 +276,14 @@ class SurveyMapView(ModelView):
         # double click in map sets 'current point': change current survey line
         self.line_select_tool.on_trait_event(self.current_point, 'current_point')
         plot.tools.append(self.line_select_tool)
+        line_name_text = TextBoxOverlay(component=plot,
+                                        text=self.get_current_line_name(),
+                                        text_color=TEXTBOX_COLOR,
+                                        align=TEXTBOX_POSITION,
+                                        bgcolor=TEXTBOX_BG_COLOR
+                                        )
+        plot.overlays.append(line_name_text)
+        self.text_overlay = line_name_text
         return plot
 
     def select_point(self, event):
@@ -222,7 +306,16 @@ class SurveyMapView(ModelView):
 
     def _select_line(self, line):
         print 'select', line.name
+        self.text_overlay.text = line.name
+        self.text_overlay.invalidate_and_redraw()
         if line in self.selected_survey_lines:
             self.selected_survey_lines.remove(line)
         else:
             self.selected_survey_lines.append(line)
+
+    def get_current_line_name(self):
+        if self.current_survey_line:
+            name = self.current_survey_line.name
+        else:
+            name = 'No line clicked'
+        return name

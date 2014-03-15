@@ -46,7 +46,7 @@ class Survey(HasTraits):
 
     #: The core samples taken in the survey
     core_samples = List(Supports(ICoreSample))
-
+    
     #: backend hdf5 file
     hdf5_file = File
 

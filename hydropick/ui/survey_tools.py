@@ -114,6 +114,11 @@ class TraceTool(BaseTool):
     # line key for this depth line.  from depth_dict, label data in data obj
     key = Str
 
+    data_changed = Bool(False)
+
+    def _target_line_changed(self):
+        self.data_changed = False
+
     def _get_data(self):
         return self.target_line.container.data
 
@@ -129,25 +134,27 @@ class TraceTool(BaseTool):
         self.event_state = 'normal'
         self.mouse_down = False
 
-    # def edit_key_pressed(self, event):
-    #     ''' reset '''
-    #     if event.character == "Esc":
-    #         self._reset()
-
     def fill_in_missing_pts(self, current_index, newy, ydata):
         """ Fill in missing points if mouse goes to fast to capture all
 
         Find linear interpolation for each array point inbetween current mouse
         position and previously captured position.
         """
-        diff = np.absolute(current_index - self.last_index)
-        if diff > 1:
-            start = min(current_index, self.last_index)
-            end = start + diff + 1
-            xpts = [start, end]
-            ypts = [self.last_y, newy]
+        diff = current_index - self.last_index
+        if np.absolute(diff) > 1:
+            # start = min(current_index, self.last_index)
+            # end = start + diff + 1
+            # xpts = [start, end]
+            #
+            if diff < 0:
+                xpts = [current_index, self.last_index + 1]
+                ypts = [newy, self.last_y]
+            else:
+                xpts = [self.last_index, current_index + 1]
+                ypts = [self.last_y, newy]
             indices = range(*xpts)
             ys = np.interp(indices, xpts, ypts)
+
         else:
             indices = [current_index]
             ys = [newy]
@@ -182,8 +189,15 @@ class TraceTool(BaseTool):
                 ydata[indices] = ys
                 data_key = self.key + '_y'
                 self.data.set_data(data_key, ydata)
-                self.last_index = indices[-1]
-                self.last_y = ys[-1]
+                self.data_changed = True
+                if self.last_index < indices[-1]:
+                    # moved right
+                    self.last_index = indices[-1]
+                    self.last_y = ys[-1]
+                else:
+                    # moved left
+                    self.last_index = indices[0]
+                    self.last_y = ys[0]
 
             else:
                 # save this mouse position as reference for further moves while
