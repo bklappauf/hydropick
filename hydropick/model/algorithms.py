@@ -49,9 +49,19 @@ class AutoThresholdCurrentSurface(HasTraits):
     arglist = ['threshold_offset']
 
     # instructions for user (description of algorithm and required args def)
-    instructions = Str('Algorith to autodetect current surface from ' +
-                       ' 200kHz intensity image. \n' +
-                       'weight = 0.0 - 1.0 (default = 0.67)')
+    instructions = Str('Algorithm to autodetect current surface from 200kHz intensity image. \n' +
+                       '----------------------------------------------------------------------------- \n' +
+                       'Algorithm has following steps: \n' +
+                       '  1) Autoremoves noise at top of image & area below main signal \n' +
+                       '  2) Find location of line of maximum intensity (approx center of sediment signal) \n' +
+                       '  3) Calculates a threshold intensity using OTSU algorithm\n' +
+                       '  4) Create binary mask using threshold intensity \n' +
+                       '  5) Despeckle binary mask using a binary opening \n' +
+                       '  6) Find location of edge of binary mask above center line\n' + 
+                       '----------------------------------------------------------------------------- \n' +
+                       'Parameters:\n' +
+                       '  threshold_offset = +/- value (default = 0.0, adjust the automatically determined threshold by this offset)\n' +
+                       '----------------------------------------------------------------------------- \n')
 
     # args
     threshold_offset = Float(0.0)
@@ -97,9 +107,21 @@ class AutoThresholdPreImpoundmentSurface(HasTraits):
     arglist = ['frequency', 'threshold_offset', 'current_surface_line']
 
     # instructions for user (description of algorithm and required args def)
-    instructions = Str('Algorith to autodetect current surface from ' +
-                       ' 200kHz intensity image. \n' +
-                       'weight = 0.0 - 1.0 (default = 0.67)')
+    instructions = Str('Algorithm to autodetect preimpoundment surface from selected intensity image. \n' +
+                       '----------------------------------------------------------------------------- \n' +
+                       'Algorithm has following steps: \n' +
+                       '  1) Clears image above selected current surface line \n' +
+                       '  2) Find location of line of maximum intensity (approx center of sediment signal) \n' +
+                       '  3) Calculates a threshold intensity using OTSU algorithm\n' +
+                       '  4) Create binary mask using threshold intensity \n' +
+                       '  5) Despeckle binary mask using a binary opening \n' +
+                       '  6) Find location of edge of binary mask below center line\n' + 
+                       '----------------------------------------------------------------------------- \n' +
+                       'Parameters:\n' +
+                       '  frequency = frequncy to use (200, 50 or 24)\n' + 
+                       '  threshold_offset = +/- value (default = 0.0, adjust the automatically determined threshold by this offset)\n' +
+                       '  current_surface_line = name of line to use as current surface (case sensitive without POST_ / _PRE prefix)\n' +
+                       '----------------------------------------------------------------------------- \n')
 
     # args
     frequency = Enum(['200', '50', '24'])
