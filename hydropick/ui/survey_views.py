@@ -737,6 +737,15 @@ class ControlView(HasTraits):
                   tooltip='click again to set to mark mode',
                   visible_when='mark_bad_data_mode=="Unmark"'
                   ),
+            Item('object.model.status'),
+            Item('object.model.status_string', label='Comment',
+                 editor=TextEditor(auto_set=False)),
+        ),
+        HGroup(
+            Item('object.model.final_lake_depth',
+                 editor=EnumEditor(name='object.model.lake_depth_choices')),
+            Item('object.model.final_preimpoundment_depth',
+                 editor=EnumEditor(name='object.model.preimpoundment_depth_choices'))
         ),
         resizable=True
     )
