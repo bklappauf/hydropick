@@ -30,41 +30,50 @@ logger = logging.getLogger(__name__)
 
 
 ALGORITHM_LIST = [
-    'AutoThresholdCurrentSurface',
-    'AutoThresholdPreImpoundmentSurface',
+    'ThresholdCurrentSurface',
+    'ThresholdPreImpoundmentSurface',
 ]
 
 
 @provides(IAlgorithm)
-class AutoThresholdCurrentSurface(HasTraits):
+class ThresholdCurrentSurface(HasTraits):
     """ Algorithm to pick current surface from 200Khz Intensity Image
 
     """
 
     #: a user-friendly name for the algorithm
-    name = Str('Current Surface Auto-Threshold Algorithm')
+    name = Str('Current Surface Threshold Algorithm')
 
     # list of names of traits defined in this class that the user needs
     # to set when the algorithm is applied
-    arglist = ['threshold_offset']
+    arglist = ['frequency', 'threshold', 'threshold_offset', 'blank_above_distance', 'blank_below_distance']
 
     # instructions for user (description of algorithm and required args def)
-    instructions = Str('Algorithm to autodetect current surface from 200kHz intensity image. \n' +
+    instructions = Str('Algorithm to autodetect current surface from selected intensity image. \n' +
                        '----------------------------------------------------------------------------- \n' +
                        'Algorithm has following steps: \n' +
-                       '  1) Autoremoves noise at top of image & area below main signal \n' +
+                       '  1) Removes noise at top & bottom of image \n' +
                        '  2) Find location of line of maximum intensity (approx center of sediment signal) \n' +
-                       '  3) Calculates a threshold intensity using OTSU algorithm\n' +
+                       '  3) Calculates a threshold intensity using OTSU algorithm or using user value\n' +
                        '  4) Create binary mask using threshold intensity \n' +
                        '  5) Despeckle binary mask using a binary opening \n' +
                        '  6) Find location of edge of binary mask above center line\n' + 
                        '----------------------------------------------------------------------------- \n' +
                        'Parameters:\n' +
-                       '  threshold_offset = +/- value (default = 0.0, adjust the automatically determined threshold by this offset)\n' +
+                       '  frequency = frequncy to use (200 (default), 50 or 24)\n' +
+                       '  threshold = 0.0 - 1.0 (if negative then automatically determine threshold using OTSU)\n' +
+                       '  threshold_offset = +/- value (default = 0.0, adjust the automatically determined threshold by this offset, ignore for manual threshold)\n' +
+                       '  blank_above_distance = value (ignore image above this depth, if negative, detect automatically)\n' +
+                       '  blank_below_distance = value (ignore image below this depth, if negative, detect automatically)\n' +
                        '----------------------------------------------------------------------------- \n')
 
     # args
-    threshold_offset = Float(0.0)
+    frequency = Enum(['200', '50', '24'])
+    threshold = Range(value=-0.1, low=-0.1, high=1.0)
+    threshold_offset = Float(0.0)    
+    blank_above_distance = Float(-1.0)
+    blank_below_distance = Float(-1.0)
+
 
     def process_line(self, survey_line):
         """ returns all zeros to provide a blank line to edit.
@@ -74,11 +83,20 @@ class AutoThresholdCurrentSurface(HasTraits):
         depth_array = np.empty(len(trace_array))
         depth_array.fill(np.nan)
 
-        intensity, freq_trace_array = _get_intensity(survey_line, '200')
-        top, bot, fit = _find_top_bottom(intensity, buf=5)
-        threshold = _auto_threshold(intensity) + self.threshold_offset
-        binary_img = _apply_threshold(intensity, threshold)
+        intensity, freq_trace_array = _get_intensity(survey_line, self.frequency)
+        top, bot = _find_top_bottom(intensity, buf=5)
+        if self.blank_above_distance>0.0:
+            top = _to_pixel(self.blank_above_distance.copy(), survey_line)
 
+        if self.blank_below_distance>0.0:
+            bot = _to_pixel(self.blank_below_distance.copy(), survey_line)
+
+        if self.threshold < 0.0:
+            actual_threshold = _auto_threshold(intensity) + self.threshold_offset
+        else:
+            actual_threshold = self.threshold.copy()
+        
+        binary_img = _apply_threshold(intensity, actual_threshold)
         centers = _find_centers(intensity[top:bot, :]) + top
 
         depth_array[freq_trace_array-1] = _find_edge(binary_img,
@@ -94,17 +112,17 @@ class AutoThresholdCurrentSurface(HasTraits):
 
 
 @provides(IAlgorithm)
-class AutoThresholdPreImpoundmentSurface(HasTraits):
-    """ Algorithm to pick current surface from 200Khz Intensity Image
+class ThresholdPreImpoundmentSurface(HasTraits):
+    """ Algorithm to pick PreImpoundment surface from selected Intensity Image
 
     """
 
     #: a user-friendly name for the algorithm
-    name = Str('PreImpoundment Auto-Threshold Algorithm')
+    name = Str('PreImpoundment Threshold Algorithm')
 
     # list of names of traits defined in this class that the user needs
     # to set when the algorithm is applied
-    arglist = ['frequency', 'threshold_offset', 'current_surface_line']
+    arglist = ['frequency', 'threshold', 'threshold_offset', 'current_surface_line']
 
     # instructions for user (description of algorithm and required args def)
     instructions = Str('Algorithm to autodetect preimpoundment surface from selected intensity image. \n' +
@@ -118,15 +136,18 @@ class AutoThresholdPreImpoundmentSurface(HasTraits):
                        '  6) Find location of edge of binary mask below center line\n' + 
                        '----------------------------------------------------------------------------- \n' +
                        'Parameters:\n' +
-                       '  frequency = frequncy to use (200, 50 or 24)\n' + 
+                       '  frequency = frequncy to use (200 (default), 50 or 24)\n' + 
+                       '  threshold = 0.0 - 1.0 (if negative then automatically determine threshold using OTSU)\n' +
                        '  threshold_offset = +/- value (default = 0.0, adjust the automatically determined threshold by this offset)\n' +
                        '  current_surface_line = name of line to use as current surface (case sensitive without POST_ / _PRE prefix)\n' +
                        '----------------------------------------------------------------------------- \n')
 
     # args
     frequency = Enum(['200', '50', '24'])
+    threshold = Range(value=-0.1, low=-0.2, high=1.0)
     threshold_offset = Float(0.0)
     current_surface_line = Str('current_surface_from_bin')
+
 
     def process_line(self, survey_line):
         """ returns all zeros to provide a blank line to edit.
@@ -140,7 +161,12 @@ class AutoThresholdPreImpoundmentSurface(HasTraits):
         current_surface_locs = _get_current_surface(survey_line, self.current_surface_line)
         current_surface_locs = current_surface_locs[freq_trace_array-1]
         intensity = _clear_image_above_line(intensity, current_surface_locs)
-        threshold = _auto_threshold(intensity) + self.threshold_offset
+
+        if self.threshold < 0.0:
+            threshold = _auto_threshold(intensity) + self.threshold_offset
+        else:
+            threshold = self.threshold
+
         binary_img = _apply_threshold(intensity, threshold)
         centers = _find_centers(intensity)
         depth_array[freq_trace_array-1] = _find_edge(binary_img,
@@ -167,7 +193,7 @@ def _find_top_bottom(img, buf=5):
     except:
         top += buf
 
-    return top, bot, fit
+    return top, bot
 
 
 def _first_point_above(x, p):
@@ -210,9 +236,8 @@ def _apply_threshold(img, threshold):
 def _get_current_surface(survey_line, current_surface_line_name):
     depth_line = survey_line.lake_depths[current_surface_line_name]
     current_depths = depth_line.depth_array.copy()
-    current_depths += survey_line.heave - survey_line.draft
 
-    return (current_depths / survey_line.pixel_resolution).astype(np.int)
+    return _convert_to_pixel(current_depths)
 
 
 def _clear_image_above_line(intensity, current_surface_locs):
@@ -226,6 +251,10 @@ def _convert_to_depth(depth_array, pixel_resolution, draft, heave):
     depth_array = _interpolate_nans(depth_array) * pixel_resolution
 
     return depth_array + draft - heave
+
+
+def _convert_to_pixel(depths, survey_line):
+    return (depths + survey_line.heave - survey_line.draft/ survey_line.pixel_resolution).astype(np.int)
 
 
 def _find_centers(img, kernel_size=9):
