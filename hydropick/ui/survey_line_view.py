@@ -360,6 +360,13 @@ class SurveyLineView(ModelView):
 
     ##############  open dialogs when requestion by user  #################
 
+    def zoom_extent(self):
+        '''reset all zoom tools'''
+        print 'reset zoom'
+        for zoom_tool in self.plot_container.zoom_tools.values():
+            print zoom_tool
+            zoom_tool._reset_state_pressed()
+
     def image_adjustment_dialog(self):
         ''' brings up image C&B edit dialog. close to continue'''
         self.image_adjust_view.configure_traits()

@@ -61,6 +61,13 @@ class SurveyLinePane(TraitsTaskPane):
     # set when survey_line is none to prevent showing invalid view.
     show_view = Bool(False)
 
+    def on_zoom_extent(self):
+        self.survey_line_view.zoom_extent()
+
+    def on_zoom_box(self):
+        ''' currently not enabled from toolbar - use z key'''
+        pass
+
     def on_image_adjustment(self):
         ''' Open dialog to adjust image (B&C : task menu)'''
         self.survey_line_view.image_adjustment_dialog()

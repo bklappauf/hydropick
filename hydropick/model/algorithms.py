@@ -78,6 +78,7 @@ class OnesAlgorithm(HasTraits):
         """
         trace_array = survey_line.trace_num
         depth_array = np.ones_like(trace_array)
+        raise ValueError
         return trace_array, depth_array
 
 @provides(IAlgorithm)

@@ -136,6 +136,8 @@ class PlotContainer(HasTraits):
     
     # color for mask plot edge
     mask_color = Str(MASK_EDGE_COLOR)
+
+    zoom_tools = Dict
     #==========================================================================
     # Define Views
     #==========================================================================
@@ -372,6 +374,7 @@ class PlotContainer(HasTraits):
             zoom = ZoomTool(main, tool_mode='box', axis='both', alpha=0.5)
             main.tools.append(zoom)
             main.overlays.append(zoom)
+            self.zoom_tools[key] = zoom
             main.value_mapper.on_trait_change(self.zoom_all_value, 'updated')
             main.index_mapper.on_trait_change(self.zoom_all_index, 'updated')
             # add line inspector and attach to freeze tool

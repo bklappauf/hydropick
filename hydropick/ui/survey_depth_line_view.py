@@ -571,9 +571,14 @@ class DepthLineView(HasStrictTraits):
         if survey_line is None:
             survey_line = self.data_session.survey_line
         algorithm = self.current_algorithm_
-        trace_array, depth_array = algorithm.process_line(survey_line)
-        model.index_array = np.asarray(trace_array, dtype=np.int32) - 1
-        model.depth_array = np.asarray(depth_array, dtype=np.float32)
+        try:
+            trace_array, depth_array = algorithm.process_line(survey_line)
+        except Exception as e:
+            self.log_problem('Error occurred applying algoritm to line {}\n{}'
+                        .format(survey_line.name, e))
+        if self.no_problem:
+            model.index_array = np.asarray(trace_array, dtype=np.int32) - 1
+            model.depth_array = np.asarray(depth_array, dtype=np.float32)
         return model
 
     def make_from_depth_line(self, line_name):
