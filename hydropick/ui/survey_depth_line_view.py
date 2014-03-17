@@ -205,9 +205,9 @@ class DepthLineView(HasStrictTraits):
                      .format(alg_name, self.current_algorithm, self.model.args))
         if self.current_algorithm is None:
             self.set_current_algorithm()
-
         self._algorithm_presenter.algorithm = self.current_algorithm
         self._algorithm_presenter.edit_traits()
+        self.current_algorithm = self._algorithm_presenter.algorithm
 
     def set_alg_args(self, model_args):
         ''' if possible, sets default arguments for current algorithm configure

@@ -26,10 +26,11 @@ import numpy as np
 from enable.api import ComponentEditor
 from traits.api import (Instance, Str, List, HasTraits, Float, Property,
                         Enum, Bool, Dict, on_trait_change, Trait,
-                        Callable, Tuple, CFloat)
+                        Callable, Tuple, CFloat, Event)
 from traitsui.api import (View, Item, EnumEditor, UItem, InstanceEditor,
                           TextEditor, RangeEditor, Label, HGroup,
-                          CheckListEditor, Group)
+                          CheckListEditor, Group, ButtonEditor
+)
 from chaco import default_colormaps
 from chaco.api import (Plot, ArrayPlotData, VPlotContainer, HPlotContainer,
                        Legend, create_scatter_plot, PlotComponent,
@@ -696,34 +697,99 @@ class PlotContainer(HasTraits):
 
 class ControlView(HasTraits):
     ''' Define controls and info subview with size control'''
+    ''' Allows user to set/view certain survey line attributes'''
+    # # list of keys for target depth lines to edit (changes if list does)
+    # target_choices = List(Str)
 
-    # list of keys for target depth lines to edit (changes if list does)
-    target_choices = List(Str)
+    # # chosen key for depth line to edit
+    # line_to_edit = Str
 
-    # chosen key for depth line to edit
-    line_to_edit = Str
+    # survey data session object
+    model = Instance(SurveyDataSession)
 
+    target_choices = Property(depends_on='model.depth_lines_updated')
     # used to explicitly get edit mode
-    edit = Enum('Editing', 'Not Editing', 'Edit Mask')     # Button('Not Editing')
+    edit = Enum('Editing', 'Not Editing', 'Mark Bad Data')
+
+    # records current sub-mode of Mark Bad Data edit mode.  Toggle with buttons
+    mark_bad_data_mode = Enum('off', 'Mark', 'Unmark')
+
+    # button event to toggle state editing state of Bad Data Edit
+    bad_data_mode_toggle = Event
 
     traits_view = View(
         HGroup(
             UItem('edit',
-                  tooltip='Toggle between "not editing" and "editing"' +\
-                  ' selected line.  When editing mask, pressing "t" ' +
-                  ' toggles between masking and unmasking'
+                  tooltip='select editing depthline, or editing bad '
                   ),
-            Item('line_to_edit',
+            Item('object.model.selected_target',
                  editor=EnumEditor(name='target_choices'),
-                 tooltip='Edit red line with right mouse button'
+                 tooltip='Edit red line with right mouse button',
+                 visible_when='edit=="Editing"'
                  ),
-               ),
+            UItem('bad_data_mode_toggle',
+                  editor=ButtonEditor(label='Marking as bad'),
+                  tooltip='click again to set to unmark mode',
+                  visible_when='mark_bad_data_mode=="Mark"'
+                  ),
+            UItem('bad_data_mode_toggle',
+                  editor=ButtonEditor(label='Unmarking bad data'),
+                  tooltip='click again to set to mark mode',
+                  visible_when='mark_bad_data_mode=="Unmark"'
+                  ),
+        ),
         resizable=True
-        )
+    )
 
     def _edit_default(self):
         return 'Not Editing'
 
+    def _bad_data_mode_toggle_fired(self):
+        self.toggle_mark_bad_data_mode()
+
+    def toggle_mark_bad_data_mode(self):
+        if self.mark_bad_data_mode == 'Mark':
+            self.mark_bad_data_mode = 'Unmark'
+        elif self.mark_bad_data_mode == 'Unmark':
+            self.mark_bad_data_mode = 'Mark'
+
+    def _edit_changed(self):
+        if self.edit == 'Mark Bad Data':
+            self.mark_bad_data_mode = 'Unmark'
+            self.bad_data_mode_toggle = True
+        elif self.edit == 'Not Editing':
+            self.mark_bad_data_mode = 'off'
+            self.model.selected_target = 'None'
+        else:
+            self.mark_bad_data_mode = 'off'
+
+    def _get_target_choices(self):
+        ''' returns list of available depth lines with "none" prepended
+        '''
+        if self.model:
+            choices = ['None'] + self.model.target_choices
+        self.model.selected_target = 'None'
+        return choices or ['None']
+
+class LineSettingsView(HasTraits):
+    ''' Allows user to set/view certain survey line attributes'''
+    model = Instance(SurveyDataSession)
+
+    traits_view = View(
+        Label('View or Set current final depth line choices for this survey' +\
+              ' line'),
+        Item('object.model.final_lake_depth',
+             editor=EnumEditor(name='object.model.lake_depth_choices')),
+        Item('object.model.final_preimpoundment_depth',
+             editor=EnumEditor(name='object.model.preimpoundment_depth_choices')),
+        Label('View or Set status and comment for this survey line'),
+        Item('object.model.status'),
+        Item('object.model.status_string'),
+        resizable=True,
+        kind='live',
+        buttons=['Cancel', 'OK']
+    )
+    
 
 class ImageAdjustView(HasTraits):
     # brightness contrast controls
@@ -748,26 +814,6 @@ class ImageAdjustView(HasTraits):
 
     def _get_contrast_brightness(self):
         return (self.contrast, self.brightness)
-
-
-class LineSettingsView(HasTraits):
-    ''' Allows user to set/view certain survey line attributes'''
-    model = Instance(SurveyDataSession)
-
-    traits_view = View(
-        Label('View or Set current final depth line choices for this survey' +\
-              ' line'),
-        Item('object.model.final_lake_depth',
-             editor=EnumEditor(name='object.model.lake_depth_choices')),
-        Item('object.model.final_preimpoundment_depth',
-             editor=EnumEditor(name='object.model.preimpoundment_depth_choices')),
-        Label('View or Set status and comment for this survey line'),
-        Item('object.model.status'),
-        Item('object.model.status_string'),
-        resizable=True,
-        kind='live',
-        buttons=['Cancel', 'OK']
-    )
 
 
 class HPlotSelectionView(HasTraits):

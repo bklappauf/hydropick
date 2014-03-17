@@ -10,7 +10,7 @@ import numpy as np
 # ETS imports
 from enable.api import BaseTool, KeySpec
 from traits.api import (Float, Enum, Int, Bool, Instance, Str, List, Set,
-                        Property)
+                        Property, Event, Any)
 from chaco.api import LinePlot, PlotComponent
 
 #==============================================================================
@@ -96,8 +96,8 @@ class TraceTool(BaseTool):
     # change behaviour of data written to line values if edit_mask is True
     edit_mask = Bool(False)
     
-    # value of mask array 0 or 1
-    mask_value = Float
+    # value of mask array maximum
+    mask_value_max = Float
     
     # these record last mouse position so that new position can be checked for
     # missing points -- i.e. delta_index should be 1
@@ -122,10 +122,15 @@ class TraceTool(BaseTool):
     key = Str
     
     toggle_character = Str('t')
+
     ##### private trait  ####
     _mask_value = Float(0)
 
     data_changed = Bool(False)
+
+    toggle_mask_edit_mode = Event
+
+    window = Any
 
     def _target_line_changed(self):
         self.data_changed = False
@@ -141,8 +146,11 @@ class TraceTool(BaseTool):
             self.event_state = 'normal'
 
     def normal_mouse_enter(self, event):
+        if not self.window:
+            self.window = event.window
         if not self.edit_mask:
-            event.window.set_pointer('arrow')
+            if self.window:
+                self.window.set_pointer('arrow')
 
     def edit_right_up(self, event):
         ''' finish editing'''
@@ -150,24 +158,29 @@ class TraceTool(BaseTool):
         self.mouse_down = False
 
     def edit_key_pressed(self, event):
-        '''  '''
-        self.change_mask_edit_state(event)
-        
-    def normal_key_pressed(self, event):
-        '''  '''
-        self.change_mask_edit_state(event)
-
-    def change_mask_edit_state(self, event):
-        ''' change state of mask edit between mask and unmask
-        hand indicated mask and cross inticates unmask'''
+        ''' this event fires the toggle event so that an outside listener
+        can call the change state event only once'''
         if event.character == self.toggle_character:
-            if self._mask_value == self.mask_value:
-                self._mask_value = 0
-                event.window.set_pointer('cross')
-            else:
-                self._mask_value = self.mask_value
-                event.window.set_pointer('hand')
-            print self._mask_value
+            self.toggle_mask_edit_event = True
+
+    def normal_key_pressed(self, event):
+        ''' this event fires the toggle event so that an outside listener
+        can call the change state event only once'''
+        if event.character == self.toggle_character:
+            self.toggle_mask_edit_event = True
+
+    def set_mask_mode(self, mode='Mark'):
+        ''' toggle mask editing from mark to unmark or back'''
+        if mode == 'Mark':
+            self._mask_value = self.mask_value_max
+            # need and event to use this method of setting cursor. 
+            if self.window:
+                self.window.set_pointer('cross')
+        else:
+            self._mask_value = 0
+            # need and event to use this method of setting cursor. 
+            if self.window:
+                self.window.set_pointer('hand')
 
     def fill_in_missing_pts(self, current_index, newy, ydata):
         """ Fill in missing points if mouse goes to fast to capture all
@@ -213,7 +226,6 @@ class TraceTool(BaseTool):
             target = self.target_line
             xdata = target.index.get_data()
             current_index = np.searchsorted(xdata, newx)
-
             if self.mouse_down:
                 ydata = target.value.get_data()
                 if self.edit_mask:

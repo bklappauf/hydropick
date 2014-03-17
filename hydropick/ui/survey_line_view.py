@@ -26,7 +26,7 @@ from .survey_views import (ControlView, InstanceUItem, PlotContainer, DataView,
 logger = logging.getLogger(__name__)
 
 EDIT_COLOR = 'black'
-EDIT_OFF_ON_CHANGE = True
+EDIT_OFF_ON_CHANGE = False
 AUTOSAVE_EDIT_ON_CHANGE = True
 
 EDIT_MASK_TOGGLE_STATE_CHAR = 't'
@@ -120,18 +120,16 @@ class SurveyLineView(ModelView):
 
     def _control_view_default(self):
         ''' Creates ControlView object filled with associated traits'''
-
-        tgt_choices = self.model.target_choices
-        choices = ['None'] + tgt_choices
-        cv = ControlView(target_choices=choices,
-                         line_to_edit=self.model.selected_target,
-                         edit='Not Editing'
+        cv = ControlView(
+                         model=self.model,
+                         mark_bad_data_mode='off',
+                         edit='Not Editing',
                          )
         # set default values for widgets
         cv.image_freq = ''
 
         # Add notifications
-        cv.on_trait_change(self.change_target, name='line_to_edit')
+        self.model.on_trait_change(self.change_target, name='selected_target')
         cv.on_trait_change(self.set_edit_enabled, name='edit')
         return cv
 
@@ -169,6 +167,8 @@ class SurveyLineView(ModelView):
                 main = hpc.components[0]
                 tool = TraceTool(main)
                 tool.toggle_character = EDIT_MASK_TOGGLE_STATE_CHAR
+                tool.on_trait_change(self.toggle_mask_edit,
+                                    'toggle_mask_edit_event')
                 main.tools.append(tool)
                 tools[key] = tool
         return tools
@@ -269,30 +269,51 @@ class SurveyLineView(ModelView):
     # Notifications, Handlers or Callbacks
     #==========================================================================
 
+    def toggle_mask_edit(self, obj, name, old, new):
+        ''' if key toggle event fires from a tool, toggle the control view
+        and set tools accordingly'''
+        print obj._mask_value
+        cv = self.control_view
+        cv.toggle_mark_bad_data_mode()
+        self.toggle_trace_tools_mask_edit()
+
+    @on_trait_change('control_view.mark_bad_data_mode')
+    def update_trace_tools(self):
+        self.toggle_trace_tools_mask_edit()
+
+    def toggle_trace_tools_mask_edit(self):
+        mode = self.control_view.mark_bad_data_mode
+        for tool in self.trace_tools.values():
+            tool.set_mask_mode(mode)
+            print tool.mask_value_max
+
     def set_edit_enabled(self, object, name, old, new):
         ''' enables editing tool based on ui edit selector'''
-        print 'enable edit', old, new
         cv = self.control_view
         if cv.edit == 'Editing':
             edit_allowed = True
             edit_mask = False
-        elif cv.edit == 'Edit Mask':
+        elif cv.edit == 'Mark Bad Data':
             edit_allowed = True
             edit_mask = True
         else:
             # 'Not Editing'
             edit_allowed = False
             edit_mask = False
-        
+        logger.debug('setting edit tools with allowed/mask = {}/{}'
+                     .format(edit_allowed, edit_mask))
         for tool in self.trace_tools.values():
             tool.edit_allowed = edit_allowed
             tool.edit_mask = edit_mask
             if edit_mask:
                 ymax = self.model.ybounds[self.model.freq_choices[-1]][1]
-                tool.mask_value = ymax
+                logger.debug('set ymax for trace tool to {}'.format(ymax))
+                tool.mask_value_max = ymax
+        if edit_mask:
+            self.toggle_trace_tools_mask_edit()
             
         # if Edit Mask selected need to change line to mask
-        if cv.edit == 'Edit Mask':
+        if cv.edit == 'Mark Bad Data':
             # first time this is called we need to set mask data
             if not self.model.survey_line.masked:
                 logger.debug('initialize mask arrays to zero')
@@ -300,17 +321,17 @@ class SurveyLineView(ModelView):
                 x, y = self.model.get_mask_xy()
                 self.plotdata.update_data(mask_x=x, mask_y=y)
 
-            if cv.line_to_edit == 'None':
+            if self.model.selected_target == 'None':
                 # explicitly call _change_target
                 self._change_target('None', 'None')
             else:
                 # tgt not None: change to None will call change_target
-                cv.line_to_edit = 'None'
+                self.model.selected_target = 'None'
         else:
-            if old == 'Edit Mask' and cv.line_to_edit == 'None':
+            if old ==  'Mark Bad Data' and self.model.selected_target == 'None':
                 # was changed out of Edit Mask => change tool tgts to None
                 self._change_target('mask','None')
-            # if line_to_edit is not None, then this was reached by
+            # if selected_target is not None, then this was reached by
             # changing the line so we don't need to do anything else
 
     @on_trait_change('model')
@@ -330,9 +351,8 @@ class SurveyLineView(ModelView):
     def update_control_view(self):
         ''' update controls when new line added'''
         cv = self.control_view
-        tgt_choices = self.model.target_choices
-        choices = ['None'] + tgt_choices
-        cv.target_choices = choices
+        cv.model = self.model
+        cv.edit = 'Not Editing'
 
     def legend_capture(self, obj, name, old, new):
         ''' stop editing depth line when moving legend (rt mouse button)'''
@@ -456,24 +476,25 @@ class SurveyLineView(ModelView):
     def change_target(self, object, name, old, new_target):
         ''' update trace tool target line attribute.
         change line colors back and set edit flag and save data as requrire
-        old and new will be strings from the line_to_edit editor
+        old and new will be strings from the seleted target editor
         in the control_view (choices are depthline.name strings)
         '''
         self._change_target(old, new_target)
         
     def _change_target(self, old, new_target):
         ''' Implements editing target change normally activated by
-        change target handler from line_to_edit listener, but can
+        change target handler from selected_target listener, but can
         also be called by set_edit handler when set to Edit Mask.
         if target goes from None to None this will only be called
         directly by the set_edit handler, otherwise through the tgt
         change handler.
         '''
+        logger.debug('change edit target from {} to {}'.format(old, new_target))
         plot_dict = self.plot_container.plot_dict
-        if self.control_view.edit == 'Edit Mask':
+        if self.control_view.edit == 'Mark Bad Data':
             # need to change target to 'mask' and revert 'old if needed
             if new_target != 'None':
-                # someone changed line_to_edit from None while in Edit Mask
+                # someone changed selected target from None while in Edit Mask
                 self.control_view.edit = 'Not Editing'
                 old = 'mask'
             else:
@@ -485,7 +506,7 @@ class SurveyLineView(ModelView):
             self.control_view.edit = 'Not Editing'
             
         # otherwise:  not edit mask and not None means tgt is new line
-        # from line_to_edit editor.  old is whatever was there before
+        # from selected_target editor.  old is whatever was there before
             
         # change colors and tool tgt for each freq plot
         edited = []
@@ -547,7 +568,7 @@ class SurveyLineView(ModelView):
         if cv.line_to_edit:
             # If there is line to edit, make sure its in visible lines list.
             # Temporarily disable notification so we don't re-call this method.
-            fullset = newset.union(set([cv.line_to_edit]))
+            fullset = newset.union(set([cv.line_toedit]))
             cv.on_trait_change(self.select_line, name='visible_lines',
                                remove=True)
             cv.visible_lines = list(fullset)
