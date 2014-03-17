@@ -49,7 +49,7 @@ class TestDepthLine(unittest.TestCase):
         ''' check is instance of DepthLine'''
         try:
             from hydropick.model.depth_line import DepthLine
-            lake_line = self.survey_line.lake_depths['depth_r1']
+            lake_line = self.survey_line.lake_depths['current_surface_from_bin']
             self.assertIsInstance(lake_line, DepthLine)
         except Exception as err:
             self.assertTrue(False, msg='undefined: {}'.format(err))
@@ -58,7 +58,7 @@ class TestDepthLine(unittest.TestCase):
         ''' check the process_line returns an array'''
         try:
 
-            lake_line = self.survey_line.lake_depths['depth_r1']
+            lake_line = self.survey_line.lake_depths['current_surface_from_bin']
             N = self.survey_line.trace_num.size
             print N, lake_line.depth_array.size
             dist_array = lake_line.distance_array(self.survey_line.trace_num)
