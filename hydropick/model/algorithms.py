@@ -19,7 +19,6 @@ import numpy as np
 from traits.api import provides, Str, HasTraits, Float, Range, Enum
 
 from scipy.signal import medfilt
-from skimage.exposure import equalize_hist
 from skimage.filter import threshold_otsu
 from sklearn.mixture import GMM
 from skimage.morphology import binary_opening, disk
@@ -74,7 +73,6 @@ class ThresholdCurrentSurface(HasTraits):
     blank_above_distance = Float(-1.0)
     blank_below_distance = Float(-1.0)
 
-
     def process_line(self, survey_line):
         """ returns all zeros to provide a blank line to edit.
         Size matches horizontal pixel number of intensity arrays
@@ -85,17 +83,17 @@ class ThresholdCurrentSurface(HasTraits):
 
         intensity, freq_trace_array = _get_intensity(survey_line, self.frequency)
         top, bot = _find_top_bottom(intensity, buf=5)
-        if self.blank_above_distance>0.0:
-            top = _to_pixel(self.blank_above_distance.copy(), survey_line)
+        if self.blank_above_distance > 0.0:
+            top = (self.blank_above_distance/survey_line.pixel_resolution).astype(np.int)
 
-        if self.blank_below_distance>0.0:
-            bot = _to_pixel(self.blank_below_distance.copy(), survey_line)
+        if self.blank_below_distance > 0.0:
+            bot = (self.blank_below_distance/survey_line.pixel_resolution).astype(np.int)
 
         if self.threshold < 0.0:
             actual_threshold = _auto_threshold(intensity) + self.threshold_offset
         else:
-            actual_threshold = self.threshold.copy()
-        
+            actual_threshold = self.threshold
+
         binary_img = _apply_threshold(intensity, actual_threshold)
         centers = _find_centers(intensity[top:bot, :]) + top
 
@@ -144,10 +142,9 @@ class ThresholdPreImpoundmentSurface(HasTraits):
 
     # args
     frequency = Enum(['200', '50', '24'])
-    threshold = Range(value=-0.1, low=-0.2, high=1.0)
+    threshold = Range(value=-0.1, low=-0.1, high=1.0)
     threshold_offset = Float(0.0)
     current_surface_line = Str('current_surface_from_bin')
-
 
     def process_line(self, survey_line):
         """ returns all zeros to provide a blank line to edit.
@@ -236,8 +233,9 @@ def _apply_threshold(img, threshold):
 def _get_current_surface(survey_line, current_surface_line_name):
     depth_line = survey_line.lake_depths[current_surface_line_name]
     current_depths = depth_line.depth_array.copy()
+    current_depths += survey_line.heave - survey_line.draft
 
-    return _convert_to_pixel(current_depths)
+    return (current_depths / survey_line.pixel_resolution).astype(np.int)
 
 
 def _clear_image_above_line(intensity, current_surface_locs):
@@ -251,10 +249,6 @@ def _convert_to_depth(depth_array, pixel_resolution, draft, heave):
     depth_array = _interpolate_nans(depth_array) * pixel_resolution
 
     return depth_array + draft - heave
-
-
-def _convert_to_pixel(depths, survey_line):
-    return (depths + survey_line.heave - survey_line.draft/ survey_line.pixel_resolution).astype(np.int)
 
 
 def _find_centers(img, kernel_size=9):
