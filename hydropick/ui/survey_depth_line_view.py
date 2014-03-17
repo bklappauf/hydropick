@@ -540,7 +540,7 @@ class DepthLineView(HasStrictTraits):
         self.current_algorithm = self.algorithms[alg_name]()
         if model_args:
             self.set_alg_args(model_args)
-            self.model_args = model_args
+            self.model.args = model_args
             logger.debug('model_args={}, alg args={}'
                          .format(self.model.args, self.alg_arg_dict))
 
@@ -570,7 +570,7 @@ class DepthLineView(HasStrictTraits):
             model = self.model
         if survey_line is None:
             survey_line = self.data_session.survey_line
-        algorithm = self.current_algorithm
+        algorithm = self.current_algorithm_
         trace_array, depth_array = algorithm.process_line(survey_line)
         model.index_array = np.asarray(trace_array, dtype=np.int32) - 1
         model.depth_array = np.asarray(depth_array, dtype=np.float32)
@@ -644,25 +644,27 @@ class DepthLineView(HasStrictTraits):
     def _get_depth_array_size(self):
         return self._array_size(self.model.depth_array)
 
-    def _get_args(self):
-        d = self.model.args
-        s = ','.join(['{}={}'.format(k, v) for k, v in d.items()])
-        return s
+    ### These will be deleted once sure they are not needed
+      #  (replaced by algorithm configure system)
+    # def _get_args(self):
+    #     d = self.model.args
+    #     s = ','.join(['{}={}'.format(k, v) for k, v in d.items()])
+    #     return s
 
-    def _set_args(self, args):
-        ''' Sets args dict in model'''
-        s = 'dict({})'.format(args)
-        d = eval('dict({})'.format(args))
-        mod_args = self.model.args
-        if isinstance(d, dict):
-            if mod_args != d:
-                self.model.args = d
-        else:
-            s = '''Cannot make dictionary out of these arguments,
-            Please check the format -- x=1, key=True, ...'''
-            self.log_problem(s)
-            if mod_args != {}:
-                self.model.args = {}
+    # def _set_args(self, args):
+    #     ''' Sets args dict in model'''
+    #     s = 'dict({})'.format(args)
+    #     d = eval('dict({})'.format(args))
+    #     mod_args = self.model.args
+    #     if isinstance(d, dict):
+    #         if mod_args != d:
+    #             self.model.args = d
+    #     else:
+    #         s = '''Cannot make dictionary out of these arguments,
+    #         Please check the format -- x=1, key=True, ...'''
+    #         self.log_problem(s)
+    #         if mod_args != {}:
+    #             self.model.args = {}
 
     def _get_selected(self):
         '''make list of selected lines with selected group on top and all lines
