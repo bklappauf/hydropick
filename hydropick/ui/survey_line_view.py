@@ -247,7 +247,13 @@ class SurveyLineView(ModelView):
             # add zoom box points for showing zoom box in mini
             d.update_data(zoombox_x=np.array([0, 0, 0, 0]),
                           zoombox_y=np.array([0, 0, 0, 0]))
-            
+
+            # add horizontal line to display depth of cursor in slice
+            # these are 2 pt line plots with the x value being the depth
+            # and the y value being the full value range limits
+            d.update_data(slice_depth_depth=np.array([0, 0]),
+                          slice_depth_y=np.array([0, 0]))
+
             # add arrays to display mask
             d.update_data(mask_x=np.array([]))
             d.update_data(mask_y=np.array([]))
@@ -272,7 +278,6 @@ class SurveyLineView(ModelView):
     def toggle_mask_edit(self, obj, name, old, new):
         ''' if key toggle event fires from a tool, toggle the control view
         and set tools accordingly'''
-        print obj._mask_value
         cv = self.control_view
         cv.toggle_mark_bad_data_mode()
         self.toggle_trace_tools_mask_edit()
@@ -285,7 +290,6 @@ class SurveyLineView(ModelView):
         mode = self.control_view.mark_bad_data_mode
         for tool in self.trace_tools.values():
             tool.set_mask_mode(mode)
-            print tool.mask_value_max
 
     def set_edit_enabled(self, object, name, old, new):
         ''' enables editing tool based on ui edit selector'''
@@ -311,7 +315,7 @@ class SurveyLineView(ModelView):
                 tool.mask_value_max = ymax
         if edit_mask:
             self.toggle_trace_tools_mask_edit()
-            
+
         # if Edit Mask selected need to change line to mask
         if cv.edit == 'Mark Bad Data':
             # first time this is called we need to set mask data
@@ -362,9 +366,7 @@ class SurveyLineView(ModelView):
 
     def zoom_extent(self):
         '''reset all zoom tools'''
-        print 'reset zoom'
         for zoom_tool in self.plot_container.zoom_tools.values():
-            print zoom_tool
             zoom_tool._reset_state_pressed()
 
     def image_adjustment_dialog(self):
@@ -397,7 +399,6 @@ class SurveyLineView(ModelView):
 
     @on_trait_change('cmap_edit_view.colormap')
     def cmap_edit(self):
-        print 'cmap edit', self.cmap_edit_view.colormap
         self.plot_container.img_colormap = self.cmap_edit_view.colormap
 
     @on_trait_change('plot_selection_view.visible_frequencies')
@@ -479,7 +480,8 @@ class SurveyLineView(ModelView):
     def update_depth(self, depth):
         ''' Called by trace tool to update depth readout display'''
         self.data_view.depth = depth
-    
+        self.plot_container.update_slice_depth_line_plot(depth=depth)
+
     def change_target(self, object, name, old, new_target):
         ''' update trace tool target line attribute.
         change line colors back and set edit flag and save data as requrire
@@ -487,7 +489,7 @@ class SurveyLineView(ModelView):
         in the control_view (choices are depthline.name strings)
         '''
         self._change_target(old, new_target)
-        
+
     def _change_target(self, old, new_target):
         ''' Implements editing target change normally activated by
         change target handler from selected_target listener, but can
@@ -511,10 +513,10 @@ class SurveyLineView(ModelView):
         elif new_target == 'None' or EDIT_OFF_ON_CHANGE:
             # this may always happens if edit is not Edit Mask
             self.control_view.edit = 'Not Editing'
-            
+
         # otherwise:  not edit mask and not None means tgt is new line
         # from selected_target editor.  old is whatever was there before
-            
+
         # change colors and tool tgt for each freq plot
         edited = []
         for key in self.model.freq_choices:

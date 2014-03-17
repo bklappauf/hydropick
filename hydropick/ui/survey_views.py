@@ -133,7 +133,7 @@ class PlotContainer(HasTraits):
 
     # private traits
     _cmap = Trait(default_colormaps.Spectral, Callable)
-    
+
     # color for mask plot edge
     mask_color = Str(MASK_EDGE_COLOR)
 
@@ -180,7 +180,7 @@ class PlotContainer(HasTraits):
     #     dr = DataRange1D()
     #     dr.set_bounds('auto', 'auto')
     #     return dr
-    
+
     #==========================================================================
     # Helper functions
     #==========================================================================
@@ -300,11 +300,17 @@ class PlotContainer(HasTraits):
                           bgcolor='beige',
                           origin='top left'
                           )
-
         slice_plot.x_axis.visible = False
         slice_key = key + '_slice'
         ydata_key = key + '_y'
         slice_plot.plot((ydata_key, slice_key), name=slice_key)
+
+        # make plot to show line at depth of cursor.  y values constant
+        slice_depth_key = key + '_depth'
+        slice_plot.plot(('slice_depth_depth', 'slice_depth_y'),
+                        name=slice_depth_key, color='red')
+        self.update_slice_depth_line_plot(slice_plot, depth=0)
+
 
         # make main plot for editing depth lines
         #************************************************************
@@ -440,7 +446,18 @@ class PlotContainer(HasTraits):
                 legend.tools.remove(highlighter)
             legend.tools.append(legend_highlighter)
             plot.invalidate_and_redraw()
-        
+
+    def update_slice_depth_line_plot(self, slice_plot=None, depth=0):
+        ''' this updates the depth data for the slice depth indicator
+        line in the slice plot.  This can be called by any source that
+        can get the depth (currently updated by the depth tool)'''
+        if slice_plot:
+            full_range = slice_plot.value_range
+            y_range = np.array([full_range.low, full_range.high])
+            self.data.update_data(slice_depth_y=y_range)
+        depth_values = np.array([depth, depth])
+        self.data.update_data(slice_depth_depth=depth_values)
+
     def plot_mask_array(self, key, main):
         ''' adds filled line plot to this Plot container showing mask
         data comes from survey_line.  Usually empty until someone
@@ -457,7 +474,7 @@ class PlotContainer(HasTraits):
                               face_color=MASK_FACE_COLOR,
                               alpha=MASK_ALPHA)[0]
         self.plot_dict[plot_key] = mask_plot
-        
+
     def update_line_plots(self, key, plot, update=False):
         ''' Updates all Line plots on ONE plot container.
         takes a Plot object and adds all available line plots to it.
@@ -582,6 +599,13 @@ class PlotContainer(HasTraits):
         slice_key = key+'_slice'
         img = hplot.components[0].plots[key][0]
 
+        # get slice plot and sinc the value to the img plot
+        slice = hplot.components[1]
+        low, high = img.value_range.low, img.value_range.high
+        slice.value_range.low_setting = low
+        slice.value_range.high_setting = high
+        self.data.set_data('slice_depth_y', np.array([low, high]))
+
         if slice_meta:    # set metadata and data
 
             # check hplot img meta != new meta. if !=, change it.
@@ -601,6 +625,7 @@ class PlotContainer(HasTraits):
             except IndexError:
                 self.data.update_data({slice_key: np.array([])})
 
+            # now get x position to see if we are close to a core
             try:
                 # abs_index is the trace number for the selected image index
                 abs_index = self.model.freq_trace_num[key][x_index] - 1
@@ -673,7 +698,7 @@ class PlotContainer(HasTraits):
             ref_depth = ref_depth_line.depth_array[loc_index]
         else:
             ref_depth = 0
-            
+
         for boundary in core.layer_boundaries:
             ys = xs * 0 + (ref_depth + boundary)
             line = create_line_plot((xs, ys), orientation='h',
@@ -803,7 +828,7 @@ class LineSettingsView(HasTraits):
         kind='live',
         buttons=['Cancel', 'OK']
     )
-    
+
 
 class ImageAdjustView(HasTraits):
     # brightness contrast controls
