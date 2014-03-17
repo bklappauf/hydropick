@@ -28,7 +28,7 @@ from traits.api import (Instance, Str, List, HasTraits, Float, Property,
                         Enum, Bool, Dict, on_trait_change, Trait,
                         Callable, Tuple, CFloat, Event)
 from traitsui.api import (View, Item, EnumEditor, UItem, InstanceEditor,
-                          TextEditor, RangeEditor, Label, HGroup,
+                          TextEditor, RangeEditor, Label, HGroup, VGroup,
                           CheckListEditor, Group, ButtonEditor
 )
 from chaco import default_colormaps
@@ -718,34 +718,36 @@ class ControlView(HasTraits):
     bad_data_mode_toggle = Event
 
     traits_view = View(
-        HGroup(
-            UItem('edit',
-                  tooltip='select editing depthline, or editing bad '
-                  ),
-            Item('object.model.selected_target',
-                 editor=EnumEditor(name='target_choices'),
-                 tooltip='Edit red line with right mouse button',
-                 visible_when='edit=="Editing"'
+        VGroup(
+            HGroup(
+                UItem('edit',
+                    tooltip='select editing depthline, or editing bad '
+                ),
+                Item('object.model.selected_target',
+                     editor=EnumEditor(name='target_choices'),
+                     tooltip='Edit red line with right mouse button',
+                     visible_when='edit=="Editing"'
                  ),
-            UItem('bad_data_mode_toggle',
-                  editor=ButtonEditor(label='Marking as bad'),
-                  tooltip='click again to set to unmark mode',
-                  visible_when='mark_bad_data_mode=="Mark"'
-                  ),
-            UItem('bad_data_mode_toggle',
-                  editor=ButtonEditor(label='Unmarking bad data'),
-                  tooltip='click again to set to mark mode',
-                  visible_when='mark_bad_data_mode=="Unmark"'
-                  ),
-            Item('object.model.status'),
-            Item('object.model.status_string', label='Comment',
-                 editor=TextEditor(auto_set=False)),
-        ),
-        HGroup(
-            Item('object.model.final_lake_depth',
-                 editor=EnumEditor(name='object.model.lake_depth_choices')),
-            Item('object.model.final_preimpoundment_depth',
-                 editor=EnumEditor(name='object.model.preimpoundment_depth_choices'))
+                UItem('bad_data_mode_toggle',
+                      editor=ButtonEditor(label='Marking as bad'),
+                      tooltip='click again to set to unmark mode',
+                      visible_when='mark_bad_data_mode=="Mark"'
+                ),
+                UItem('bad_data_mode_toggle',
+                      editor=ButtonEditor(label='Unmarking bad data'),
+                      tooltip='click again to set to mark mode',
+                      visible_when='mark_bad_data_mode=="Unmark"'
+                ),
+                Item('object.model.status'),
+                Item('object.model.status_string', label='Comment',
+                     editor=TextEditor(auto_set=False)),
+            ),
+            HGroup(
+                Item('object.model.final_lake_depth',
+                     editor=EnumEditor(name='object.model.lake_depth_choices')),
+                Item('object.model.final_preimpoundment_depth',
+                     editor=EnumEditor(name='object.model.preimpoundment_depth_choices'))
+            )
         ),
         resizable=True
     )
