@@ -541,7 +541,7 @@ class DepthLineView(HasStrictTraits):
         self.current_algorithm = self.algorithms[alg_name]()
         if model_args:
             self.set_alg_args(model_args)
-            self.model_args = model_args
+            self.model.args = model_args
             logger.debug('model_args={}, alg args={}'
                          .format(self.model.args, self.alg_arg_dict))
 
