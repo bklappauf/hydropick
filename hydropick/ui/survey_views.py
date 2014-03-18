@@ -6,16 +6,8 @@
 #
 
 """ View definitions for controlling layout of survey line editor task
-
-Views are:
-*BigView:
-    Example of use for  overall layout with Controls on left and Plots on
-    right.
-*PlotView:
-    Sets plot view which may be just the plot component and legend.
-*ControlView:
-    Set layout of controls and information displays
 """
+
 # Std lib imports
 import logging
 
@@ -26,10 +18,11 @@ import numpy as np
 from enable.api import ComponentEditor
 from traits.api import (Instance, Str, List, HasTraits, Float, Property,
                         Enum, Bool, Dict, on_trait_change, Trait,
-                        Callable, Tuple, CFloat)
+                        Callable, Tuple, CFloat, Event)
 from traitsui.api import (View, Item, EnumEditor, UItem, InstanceEditor,
-                          TextEditor, RangeEditor, Label, HGroup,
-                          CheckListEditor, Group)
+                          TextEditor, RangeEditor, Label, HGroup, VGroup,
+                          CheckListEditor, Group, ButtonEditor
+)
 from chaco import default_colormaps
 from chaco.api import (Plot, ArrayPlotData, VPlotContainer, HPlotContainer,
                        Legend, create_scatter_plot, PlotComponent,
@@ -63,6 +56,10 @@ CONTRAST_MAX = float(20)
 
 CORE_VISIBILITY_CRITERIA = 200.0
 CORE_LINE_WIDTH = 2
+
+MASK_EDGE_COLOR = 'black'
+MASK_FACE_COLOR = 'black'
+MASK_ALPHA = 0.5
 
 
 class InstanceUItem(UItem):
@@ -129,7 +126,10 @@ class PlotContainer(HasTraits):
     # private traits
     _cmap = Trait(default_colormaps.Spectral, Callable)
 
-    # main_value_range = Instance(DataRange1D)   #
+    # color for mask plot edge
+    mask_color = Str(MASK_EDGE_COLOR)
+
+    zoom_tools = Dict
     #==========================================================================
     # Define Views
     #==========================================================================
@@ -168,11 +168,6 @@ class PlotContainer(HasTraits):
     def _img_colormap_default(self):
         return DEFAULT_COLORMAP
 
-    # def _main_value_range_default(self):
-    #     dr = DataRange1D()
-    #     dr.set_bounds('auto', 'auto')
-    #     return dr
-    
     #==========================================================================
     # Helper functions
     #==========================================================================
@@ -292,11 +287,17 @@ class PlotContainer(HasTraits):
                           bgcolor='beige',
                           origin='top left'
                           )
-
         slice_plot.x_axis.visible = False
         slice_key = key + '_slice'
         ydata_key = key + '_y'
         slice_plot.plot((ydata_key, slice_key), name=slice_key)
+
+        # make plot to show line at depth of cursor.  y values constant
+        slice_depth_key = key + '_depth'
+        slice_plot.plot(('slice_depth_depth', 'slice_depth_y'),
+                        name=slice_depth_key, color='red')
+        self.update_slice_depth_line_plot(slice_plot, depth=0)
+
 
         # make main plot for editing depth lines
         #************************************************************
@@ -321,6 +322,7 @@ class PlotContainer(HasTraits):
         # add line plots: use method since these may change
         #************************************************************
         self.update_line_plots(key, main, update=True)
+        self.plot_mask_array(key, main)
 
         # set slice plot index range to follow main plot value range
         #************************************************************
@@ -365,6 +367,7 @@ class PlotContainer(HasTraits):
             zoom = ZoomTool(main, tool_mode='box', axis='both', alpha=0.5)
             main.tools.append(zoom)
             main.overlays.append(zoom)
+            self.zoom_tools[key] = zoom
             main.value_mapper.on_trait_change(self.zoom_all_value, 'updated')
             main.index_mapper.on_trait_change(self.zoom_all_index, 'updated')
             # add line inspector and attach to freeze tool
@@ -415,7 +418,9 @@ class PlotContainer(HasTraits):
             legend.plots[k] = plot.plots[k]
 
     def update_all_line_plots(self, update=False):
-        ''' reload all line plots when added or changed'''
+        ''' reload all line plots when added or changed.
+        updates all hplot containers and legends.
+        calls "update_line_plots" for each hplot'''
         for key in self.model.freq_choices:
             hpc = self.hplot_dict[key]
             plot = hpc.components[0]
@@ -429,8 +434,37 @@ class PlotContainer(HasTraits):
             legend.tools.append(legend_highlighter)
             plot.invalidate_and_redraw()
 
+    def update_slice_depth_line_plot(self, slice_plot=None, depth=0):
+        ''' this updates the depth data for the slice depth indicator
+        line in the slice plot.  This can be called by any source that
+        can get the depth (currently updated by the depth tool)'''
+        if slice_plot:
+            full_range = slice_plot.value_range
+            y_range = np.array([full_range.low, full_range.high])
+            self.data.update_data(slice_depth_y=y_range)
+        depth_values = np.array([depth, depth])
+        self.data.update_data(slice_depth_depth=depth_values)
+
+    def plot_mask_array(self, key, main):
+        ''' adds filled line plot to this Plot container showing mask
+        data comes from survey_line.  Usually empty until someone
+        edits bad points.  Then the x data is distance array and
+        y data is mask * y_max '''
+        plot_key = key + '_mask'
+        if self.model.survey_line.masked:
+            x, y = self.model.get_mask_xy()
+            self.data.update_data(mask_x=x, mask_y=y)
+        mask_plot = main.plot(('mask_x', 'mask_y'),
+                              type='filled_line',
+                              name=plot_key,
+                              edge_color=MASK_EDGE_COLOR,
+                              face_color=MASK_FACE_COLOR,
+                              alpha=MASK_ALPHA)[0]
+        self.plot_dict[plot_key] = mask_plot
+
     def update_line_plots(self, key, plot, update=False):
-        ''' takes a Plot object and adds all available line plots to it.
+        ''' Updates all Line plots on ONE plot container.
+        takes a Plot object and adds all available line plots to it.
         Each Plot.plots has one img plot labeled by freq key and the rest are
         line plots.  When depth_dict is updated, check all keys to see all
         lines are plotted.  Update=True will replot all lines even if already
@@ -488,6 +522,7 @@ class PlotContainer(HasTraits):
         self.create_vplot()
 
     def zoom_all_value(self, obj, name, old, new):
+        ''' gets value_mapper object from notification'''
         low, high = obj.range.low, obj.range.high
         # change y values of zoombox in mini
         self.data.update_data(zoombox_y=np.array([low, low, high, high]))
@@ -500,16 +535,17 @@ class PlotContainer(HasTraits):
                     vmapper.range.high = high
 
     def zoom_all_index(self, obj, name, old, new):
+        ''' gets index_mapper object from notification'''
         low, high = obj.range.low, obj.range.high
         # change x values of zoombox
         self.data.update_data(zoombox_x=np.array([low, high, high, low]))
         for key, hpc in self.hplot_dict.items():
             if key != 'mini':
-                vmapper = hpc.components[0].index_mapper
-                if vmapper.range.low != low:
-                    vmapper.range.low = low
-                if vmapper.range.high != high:
-                    vmapper.range.high = high
+                mapper = hpc.components[0].index_mapper
+                if mapper.range.low != low:
+                    mapper.range.low = low
+                if mapper.range.high != high:
+                    mapper.range.high = high
 
 
     def _range_selection_handler(self, event):
@@ -550,6 +586,13 @@ class PlotContainer(HasTraits):
         slice_key = key+'_slice'
         img = hplot.components[0].plots[key][0]
 
+        # get slice plot and sinc the value to the img plot
+        slice = hplot.components[1]
+        low, high = img.value_range.low, img.value_range.high
+        slice.value_range.low_setting = low
+        slice.value_range.high_setting = high
+        self.data.set_data('slice_depth_y', np.array([low, high]))
+
         if slice_meta:    # set metadata and data
 
             # check hplot img meta != new meta. if !=, change it.
@@ -569,6 +612,7 @@ class PlotContainer(HasTraits):
             except IndexError:
                 self.data.update_data({slice_key: np.array([])})
 
+            # now get x position to see if we are close to a core
             try:
                 # abs_index is the trace number for the selected image index
                 abs_index = self.model.freq_trace_num[key][x_index] - 1
@@ -641,7 +685,7 @@ class PlotContainer(HasTraits):
             ref_depth = ref_depth_line.depth_array[loc_index]
         else:
             ref_depth = 0
-            
+
         for boundary in core.layer_boundaries:
             ys = xs * 0 + (ref_depth + boundary)
             line = create_line_plot((xs, ys), orientation='h',
@@ -662,38 +706,111 @@ class PlotContainer(HasTraits):
             if img_plot is not None:
                 value_range = img_plot.color_mapper.range
                 img_plot.color_mapper = self._cmap(value_range)
-            print 'redraw', key
             main.invalidate_and_redraw()
 
 
 class ControlView(HasTraits):
     ''' Define controls and info subview with size control'''
+    ''' Allows user to set/view certain survey line attributes'''
 
-    # list of keys for target depth lines to edit (changes if list does)
-    target_choices = List(Str)
+    # survey data session object
+    model = Instance(SurveyDataSession)
 
-    # chosen key for depth line to edit
-    line_to_edit = Str
+    target_choices = Property(depends_on='model.depth_lines_updated')
 
     # used to explicitly get edit mode
-    edit = Enum('Editing', 'Not Editing')     # Button('Not Editing')
+    edit = Enum('Editing', 'Not Editing', 'Mark Bad Data')
+
+    # records current sub-mode of Mark Bad Data edit mode.  Toggle with buttons
+    mark_bad_data_mode = Enum('off', 'Mark', 'Unmark')
+
+    # button event to toggle state editing state of Bad Data Edit
+    bad_data_mode_toggle = Event
 
     traits_view = View(
-        HGroup(
-            UItem('edit',
-                  tooltip='Toggle between "not editing" and \
-                          "editing" selected line'
-                  ),
-            Item('line_to_edit',
-                 editor=EnumEditor(name='target_choices'),
-                 tooltip='Edit red line with right mouse button'
+        VGroup(
+            HGroup(
+                UItem('edit',
+                    tooltip='select editing depthline, or editing bad '
+                ),
+                Item('object.model.selected_target',
+                     editor=EnumEditor(name='target_choices'),
+                     tooltip='Edit red line with right mouse button',
+                     visible_when='edit=="Editing"'
                  ),
+                UItem('bad_data_mode_toggle',
+                      editor=ButtonEditor(label='Marking as bad'),
+                      tooltip='click again to set to unmark mode',
+                      visible_when='mark_bad_data_mode=="Mark"'
+                ),
+                UItem('bad_data_mode_toggle',
+                      editor=ButtonEditor(label='Unmarking bad data'),
+                      tooltip='click again to set to mark mode',
+                      visible_when='mark_bad_data_mode=="Unmark"'
+                ),
+                Item('object.model.status'),
+                Item('object.model.status_string', label='Comment',
+                     editor=TextEditor(auto_set=False)),
             ),
+            HGroup(
+                Item('object.model.final_lake_depth',
+                     editor=EnumEditor(name='object.model.lake_depth_choices')),
+                Item('object.model.final_preimpoundment_depth',
+                     editor=EnumEditor(name='object.model.preimpoundment_depth_choices'))
+            )
+        ),
         resizable=True
-        )
+    )
 
     def _edit_default(self):
         return 'Not Editing'
+
+    def _bad_data_mode_toggle_fired(self):
+        self.toggle_mark_bad_data_mode()
+
+    def toggle_mark_bad_data_mode(self):
+        if self.mark_bad_data_mode == 'Mark':
+            self.mark_bad_data_mode = 'Unmark'
+        elif self.mark_bad_data_mode == 'Unmark':
+            self.mark_bad_data_mode = 'Mark'
+
+    def _edit_changed(self):
+        if self.edit == 'Mark Bad Data':
+            self.mark_bad_data_mode = 'Unmark'
+            self.bad_data_mode_toggle = True
+        elif self.edit == 'Not Editing':
+            self.mark_bad_data_mode = 'off'
+            self.model.selected_target = 'None'
+        else:
+            self.mark_bad_data_mode = 'off'
+
+    def _get_target_choices(self):
+        ''' returns list of available depth lines with "none" prepended
+        '''
+        if self.model:
+            choices = ['None'] + self.model.target_choices
+        self.model.selected_target = 'None'
+        return choices or ['None']
+
+
+class LineSettingsView(HasTraits):
+    ''' Allows user to set/view certain survey line attributes'''
+    model = Instance(SurveyDataSession)
+
+    traits_view = View(
+        Label('View or Set current final depth line choices for this survey' +\
+              ' line'),
+        Item('object.model.final_lake_depth',
+             editor=EnumEditor(name='object.model.lake_depth_choices')),
+        Item('object.model.final_preimpoundment_depth',
+             editor=EnumEditor(name='object.model.preimpoundment_depth_choices')),
+        Label('View or Set status and comment for this survey line'),
+        Item('object.model.status'),
+        Item('object.model.status_string'),
+        resizable=True,
+        kind='live',
+        buttons=['Cancel', 'OK']
+    )
 
 
 class ImageAdjustView(HasTraits):
@@ -719,26 +836,6 @@ class ImageAdjustView(HasTraits):
 
     def _get_contrast_brightness(self):
         return (self.contrast, self.brightness)
-
-
-class LineSettingsView(HasTraits):
-    ''' Allows user to set/view certain survey line attributes'''
-    model = Instance(SurveyDataSession)
-
-    traits_view = View(
-        Label('View or Set current final depth line choices for this survey' +\
-              ' line'),
-        Item('object.model.final_lake_depth',
-             editor=EnumEditor(name='object.model.lake_depth_choices')),
-        Item('object.model.final_preimpoundment_depth',
-             editor=EnumEditor(name='object.model.preimpoundment_depth_choices')),
-        Label('View or Set status and comment for this survey line'),
-        Item('object.model.status'),
-        Item('object.model.status_string'),
-        resizable=True,
-        kind='live',
-        buttons=['Cancel', 'OK']
-    )
 
 
 class HPlotSelectionView(HasTraits):

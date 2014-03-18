@@ -12,7 +12,7 @@ import numpy as np
 from shapely.geometry import LineString
 
 from traits.api import (HasTraits, Array, Dict, Event, List, Supports, Str,
-                        provides, CFloat, Instance, Bool, Enum)
+                        provides, CFloat, Instance, Bool, Enum, Property)
 
 from .i_core_sample import ICoreSample
 from .i_survey_line import ISurveyLine
@@ -97,14 +97,23 @@ class SurveyLine(HasTraits):
     # user comment on status (who approved it or why its bad fore example)
     status_string = Str('')
 
+    # mask is bool array, size trace_num,  indicating bad traces. True is bad/masked
+    mask = Array(Bool)
+
+    # indicated if mask has been defined for this line
+    masked = Property(Bool, depends_on='mask')
+
+    def _get_masked(self):
+        masked = False
+        if self.mask is not None:
+            size = self.mask.size
+            if size > 0:
+                masked = True
+        return masked
+
     def load_data(self, hdf5_file):
         ''' Called by UI to load this survey line when selected to edit
         '''
-        # read in sdi dictionary.  Only use 'frequencies' item.
-        # sdi_dict_separated = binary.read(self.data_file_path)
-        # sdi_dict_raw = binary.read(self.data_file_path, separate=False)
-        # freq_dict_list = sdi_dict_separated['frequencies']
-
         from ..io import survey_io
 
         # read frequency dict from hdf5 file.
@@ -174,18 +183,6 @@ class SurveyLine(HasTraits):
         logger.info('Checking all array integrity for line {}'.format(name))
         arrays = ['trace_num', 'locations', 'lat_long', 'heave', 'power',
                   'gain']
-        # N = self.trace_num.shape[0]
-        # check = self.trace_num - np.arange(N) - 1
-        # if np.any(check != 0):
-        #     bad_traces = np.nonzero(check)[0] + 1
-        #     values = self.trace_num[bad_traces - 1]
-        #     print check, bad_traces, values
-        #     s = '''trace_num not contiguous for array: {}.
-        #     values of {} at traces {}
-        #     '''.format(name, values, bad_traces)
-        #     logger.warn(s)
-        #     self.fix_trace_num(N, bad_traces, values)
-        # now check rest of arrays
 
         from ..io import survey_io
         bad_indices, bad_vals = survey_io.check_trace_num_array(self.trace_num,
@@ -202,14 +199,3 @@ class SurveyLine(HasTraits):
                 logger.warn(s)
                 self.bad_survey_line = "Array sizes don't match on load"
 
-    # def fix_trace_num(self, N, bad_traces, values):
-    #     for freq, trace_array in self.freq_trace_num.items():
-    #         for t, v in zip(bad_traces, values):
-    #             if v in trace_array:
-    #                 i = np.floor((t - 1) / 3.0)
-    #                 print 'freq trace i value is',freq, i, trace_array[i], i+1
-    #                 trace_array[i] = t
-    #         self.freq_trace_num[freq] = trace_array
-    #     for f, v in self.freq_trace_num.items():
-    #         print 'max is ', f, v.max(), v.shape
-    #     self.trace_num = np.arange(1, N + 1)
