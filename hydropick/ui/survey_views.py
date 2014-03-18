@@ -6,16 +6,8 @@
 #
 
 """ View definitions for controlling layout of survey line editor task
-
-Views are:
-*BigView:
-    Example of use for  overall layout with Controls on left and Plots on
-    right.
-*PlotView:
-    Sets plot view which may be just the plot component and legend.
-*ControlView:
-    Set layout of controls and information displays
 """
+
 # Std lib imports
 import logging
 
@@ -175,11 +167,6 @@ class PlotContainer(HasTraits):
 
     def _img_colormap_default(self):
         return DEFAULT_COLORMAP
-
-    # def _main_value_range_default(self):
-    #     dr = DataRange1D()
-    #     dr.set_bounds('auto', 'auto')
-    #     return dr
 
     #==========================================================================
     # Helper functions
@@ -719,23 +706,18 @@ class PlotContainer(HasTraits):
             if img_plot is not None:
                 value_range = img_plot.color_mapper.range
                 img_plot.color_mapper = self._cmap(value_range)
-            print 'redraw', key
             main.invalidate_and_redraw()
 
 
 class ControlView(HasTraits):
     ''' Define controls and info subview with size control'''
     ''' Allows user to set/view certain survey line attributes'''
-    # # list of keys for target depth lines to edit (changes if list does)
-    # target_choices = List(Str)
-
-    # # chosen key for depth line to edit
-    # line_to_edit = Str
 
     # survey data session object
     model = Instance(SurveyDataSession)
 
     target_choices = Property(depends_on='model.depth_lines_updated')
+
     # used to explicitly get edit mode
     edit = Enum('Editing', 'Not Editing', 'Mark Bad Data')
 
@@ -809,6 +791,7 @@ class ControlView(HasTraits):
             choices = ['None'] + self.model.target_choices
         self.model.selected_target = 'None'
         return choices or ['None']
+
 
 class LineSettingsView(HasTraits):
     ''' Allows user to set/view certain survey line attributes'''

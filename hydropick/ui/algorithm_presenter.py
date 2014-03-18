@@ -4,6 +4,7 @@ from traitsui.api import View, Item, TextEditor, Group, UItem, Label
 
 from hydropick.model.i_algorithm import IAlgorithm
 
+
 class AlgorithmPresenter(HasStrictTraits):
 
     algorithm = Instance(IAlgorithm)
@@ -12,11 +13,13 @@ class AlgorithmPresenter(HasStrictTraits):
         view = View(
             Group(
                 Label('Instructions:', emphasized=True),
-                UItem('object.algorithm.instructions', editor=TextEditor(), style='readonly',
+                UItem('object.algorithm.instructions',
+                      editor=TextEditor(), style='readonly',
                       emphasized=True)
             ),
             Item('_'),
-            *['object.algorithm.{}'.format(arg) for arg in self.algorithm.arglist],
+            *['object.algorithm.{}'.format(arg)
+              for arg in self.algorithm.arglist],
             buttons=['OK', 'Cancel'],
             kind='modal'
         )

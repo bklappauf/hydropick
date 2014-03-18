@@ -92,13 +92,13 @@ class TraceTool(BaseTool):
 
     # determines whether tool is allowed in edit state when mouse pressed
     edit_allowed = Bool(False)
-    
+
     # change behaviour of data written to line values if edit_mask is True
     edit_mask = Bool(False)
-    
+
     # value of mask array maximum
     mask_value_max = Float
-    
+
     # these record last mouse position so that new position can be checked for
     # missing points -- i.e. delta_index should be 1
     last_index = Int(np.nan)
@@ -111,26 +111,27 @@ class TraceTool(BaseTool):
     # editing starts.  this could possibly be done with mouse down instead.
     mouse_down = Bool(False)
 
+    # line being edited
     target_line = Instance(PlotComponent)
 
     # ArrayPlotData object holding all data.  This tool will change this data
     # which then updates all three freq plots at once.
-
     data = Property()
-    
+
     # line key for this depth line.  from depth_dict, label data in data obj
     key = Str
-    
-    toggle_character = Str('t')
 
-    ##### private trait  ####
-    _mask_value = Float(0)
+    toggle_character = Str('t')
 
     data_changed = Bool(False)
 
     toggle_mask_edit_mode = Event
 
     window = Any
+    
+    ##### private trait  ####
+    _mask_value = Float(0)
+
 
     def _target_line_changed(self):
         self.data_changed = False
@@ -173,12 +174,12 @@ class TraceTool(BaseTool):
         ''' toggle mask editing from mark to unmark or back'''
         if mode == 'Mark':
             self._mask_value = self.mask_value_max
-            # need and event to use this method of setting cursor. 
+            # need and event to use this method of setting cursor.
             if self.window:
                 self.window.set_pointer('cross')
         else:
             self._mask_value = 0
-            # need and event to use this method of setting cursor. 
+            # need and event to use this method of setting cursor.
             if self.window:
                 self.window.set_pointer('hand')
 
