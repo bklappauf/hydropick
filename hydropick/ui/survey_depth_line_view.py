@@ -12,8 +12,8 @@ import logging
 import numpy as np
 
 # ETS imports
-from traits.api import (Instance, Event, Str, Property, HasStrictTraits, Int, List,
-                        on_trait_change, Button, Bool, Supports, Dict)
+from traits.api import (Instance, Event, Str, Property, HasStrictTraits, Int,
+                        on_trait_change, Button, Bool, Supports, List, Dict)
 from traitsui.api import (View, VGroup, HGroup, Item, UItem, EnumEditor,
                           TextEditor, ListEditor, ButtonEditor)
 
@@ -66,9 +66,6 @@ class DepthLineView(HasStrictTraits):
 
     # current depth line object
     model = Instance(DepthLine)
-
-    # set of arguments for algorithms.  Assume keyword.  makes dict
-   # args = Property(Str, depends_on=['model.args', 'model'])
 
     # arrays to plot
     index_array_size = Property(Int, depends_on=['model.index_array, model'])
@@ -156,11 +153,6 @@ class DepthLineView(HasStrictTraits):
                UItem('configure_algorithm_done',
                      visible_when=('current_algorithm')
                      ),
-               # Item('args',
-               #      editor=TextEditor(auto_set=False, enter_set=False),
-               #      tooltip=ARG_TOOLTIP,
-               #      visible_when='object.model.source=="algorithm"'
-               #    ),
                Item('index_array_size', style='readonly'),
                Item('depth_array_size', style='readonly'),
                Item('object.model.edited', style='readonly'),
@@ -205,7 +197,6 @@ class DepthLineView(HasStrictTraits):
                      .format(alg_name, self.current_algorithm, self.model.args))
         if self.current_algorithm is None:
             self.set_current_algorithm()
-
         self._algorithm_presenter.algorithm = self.current_algorithm
         self._algorithm_presenter.edit_traits()
         self.current_algorithm = self._algorithm_presenter.algorithm
@@ -220,7 +211,6 @@ class DepthLineView(HasStrictTraits):
                 setattr(alg, arg, model_args[arg])
         except Exception as e:
             logger.warning('could not set arguments from model.args')
-            print 'Warning: could not set args', e
 
     @on_trait_change('current_algorithm.+')
     def update_model_args(self, object, name, old, new):
@@ -396,7 +386,6 @@ class DepthLineView(HasStrictTraits):
                     lname = line.name
                     s = 'saving new depth line to surveyline {}'.format(lname)
                     logger.info(s)
-                    print 'saving', self.model.name, line.name
                     # save to appropriate depth line dictionary and change
                     # final line to new line
                     if model.line_type == 'current surface':
@@ -521,12 +510,7 @@ class DepthLineView(HasStrictTraits):
         logger.debug('checking args for alg {} with args {}'
                      .format(alg.name, self.alg_arg_dict))
         if alg:
-            # tst = [self.model.args.get(arg, None) ==
-            #        getattr(alg, arg) for arg in alg.arglist]
             tst = (self.model.args == self.alg_arg_dict)
-            # if not all(tst):
-            #     s = 'arguments do not match - please configure algorithm.'
-            #     self.log_problem(s)
             if not tst:
                 s = 'arguments do not match - please configure algorithm.'
                 self.log_problem(s)
@@ -571,10 +555,15 @@ class DepthLineView(HasStrictTraits):
             model = self.model
         if survey_line is None:
             survey_line = self.data_session.survey_line
-        algorithm = self.current_algorithm
-        trace_array, depth_array = algorithm.process_line(survey_line)
-        model.index_array = np.asarray(trace_array, dtype=np.int32) - 1
-        model.depth_array = np.asarray(depth_array, dtype=np.float32)
+        algorithm = self.current_algorithm_
+        try:
+            trace_array, depth_array = algorithm.process_line(survey_line)
+        except Exception as e:
+            self.log_problem('Error occurred applying algoritm to line {}\n{}'
+                        .format(survey_line.name, e))
+        if self.no_problem:
+            model.index_array = np.asarray(trace_array, dtype=np.int32) - 1
+            model.depth_array = np.asarray(depth_array, dtype=np.float32)
         return model
 
     def make_from_depth_line(self, line_name):
@@ -645,40 +634,15 @@ class DepthLineView(HasStrictTraits):
     def _get_depth_array_size(self):
         return self._array_size(self.model.depth_array)
 
-    def _get_args(self):
-        d = self.model.args
-        s = ','.join(['{}={}'.format(k, v) for k, v in d.items()])
-        return s
-
-    def _set_args(self, args):
-        ''' Sets args dict in model'''
-        s = 'dict({})'.format(args)
-        d = eval('dict({})'.format(args))
-        mod_args = self.model.args
-        if isinstance(d, dict):
-            if mod_args != d:
-                self.model.args = d
-        else:
-            s = '''Cannot make dictionary out of these arguments,
-            Please check the format -- x=1, key=True, ...'''
-            self.log_problem(s)
-            if mod_args != {}:
-                self.model.args = {}
-
     def _get_selected(self):
         '''make list of selected lines with selected group on top and all lines
         '''
-        #group_string = 'No Group Selected'
         all_lines = []
-        # if self.current_survey_line_group:
-        #     group_name = self.current_survey_line_group.name
-        #     group_string = 'GROUP: ' + group_name
         if self.selected_survey_lines:
             all_lines = [line.name for line in self.selected_survey_lines]
             num_lines = len(all_lines)
         else:
             num_lines = 0
-        # return [group_string] + ['LINES: {}'.format(num_lines)] + all_lines
         return ['LINES: {}'.format(num_lines)] + all_lines
 
 

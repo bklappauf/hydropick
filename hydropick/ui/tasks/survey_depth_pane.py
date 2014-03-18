@@ -50,9 +50,8 @@ class SurveyDepthPane(TraitsDockPane):
 
     # dict of algorithms
     algorithms = DelegatesTo('task')
-    
-    #hdf5_file = Property(depends_on='survey')
 
+    # determines visibility of Depthline view
     show_view = Bool(False)
 
     def _depth_line_view_default(self):

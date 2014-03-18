@@ -56,7 +56,7 @@ class ThresholdCurrentSurface(HasTraits):
                        '  3) Calculates a threshold intensity using OTSU algorithm or using user value\n' +
                        '  4) Create binary mask using threshold intensity \n' +
                        '  5) Despeckle binary mask using a binary opening \n' +
-                       '  6) Find location of edge of binary mask above center line\n' + 
+                       '  6) Find location of edge of binary mask above center line\n' +
                        '----------------------------------------------------------------------------- \n' +
                        'Parameters:\n' +
                        '  frequency = frequncy to use (200 (default), 50 or 24)\n' +
@@ -69,7 +69,7 @@ class ThresholdCurrentSurface(HasTraits):
     # args
     frequency = Enum(['200', '50', '24'])
     threshold = Range(value=-0.1, low=-0.1, high=1.0)
-    threshold_offset = Float(0.0)    
+    threshold_offset = Float(0.0)
     blank_above_distance = Float(-1.0)
     blank_below_distance = Float(-1.0)
 
@@ -131,10 +131,10 @@ class ThresholdPreImpoundmentSurface(HasTraits):
                        '  3) Calculates a threshold intensity using OTSU algorithm\n' +
                        '  4) Create binary mask using threshold intensity \n' +
                        '  5) Despeckle binary mask using a binary opening \n' +
-                       '  6) Find location of edge of binary mask below center line\n' + 
+                       '  6) Find location of edge of binary mask below center line\n' +
                        '----------------------------------------------------------------------------- \n' +
                        'Parameters:\n' +
-                       '  frequency = frequncy to use (200 (default), 50 or 24)\n' + 
+                       '  frequency = frequncy to use (200 (default), 50 or 24)\n' +
                        '  threshold = 0.0 - 1.0 (if negative then automatically determine threshold using OTSU)\n' +
                        '  threshold_offset = +/- value (default = 0.0, adjust the automatically determined threshold by this offset)\n' +
                        '  current_surface_line = name of line to use as current surface (case sensitive without POST_ / _PRE prefix)\n' +
@@ -222,7 +222,6 @@ def _auto_threshold(img):
 
 
 def _apply_threshold(img, threshold):
-    print 'applied threshold = ',threshold 
     binary_img = img < threshold
     #remove small speckles
     binary_img = binary_opening(binary_img, disk(3))
@@ -240,7 +239,7 @@ def _get_current_surface(survey_line, current_surface_line_name):
 
 def _clear_image_above_line(intensity, current_surface_locs):
     for i, p in enumerate(current_surface_locs):
-        intensity[:p, i] = np.median(intensity[:p,i])
+        intensity[:p, i] = np.median(intensity[:p, i])
 
     return intensity
 
@@ -291,4 +290,3 @@ def _interpolate_nans(y):
     nans, x = np.isnan(y), lambda z: z.nonzero()[0]
     y[nans] = np.interp(x(nans), x(~nans), y[~nans])
     return y.round(0).astype(np.int)
-

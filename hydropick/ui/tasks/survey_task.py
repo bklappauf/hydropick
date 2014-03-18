@@ -212,6 +212,13 @@ class SurveyTask(Task):
                            method='on_next_line',
                            enabled_name='survey.survey_lines',
                            image=ImageResource("arrow-right")),
+                CentralPaneAction(name='Zoom Extent',
+                                  method='on_zoom_extent',
+                                  image=ImageResource("zoom_extent"),
+                                  enabled_name='show_view'),
+                CentralPaneAction(name='Zoom Box (press "z")',
+                                  method='on_zoom_box',
+                                  enabled_name='False'),
                 id='Survey', name="Survey", show_tool_names=False,
                 image_size=(24, 24)
             ),

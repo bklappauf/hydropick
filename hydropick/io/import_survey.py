@@ -19,8 +19,6 @@ from hydropick.io.survey_io import (import_survey_line_from_file,
 
 logger = logging.getLogger(__name__)
 
-# XXX this is not fully implemented
-
 
 def get_name(directory):
     # name defaults to parent and grandparent directory names
