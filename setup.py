@@ -33,7 +33,7 @@ setup(
     maintainer_email='dharhas.pothina@twdb.texas.gov',
     package_data={
         'hydropick': [
-            'hydropick/ui/tasks/images/24x24/*.png',
+            'ui/tasks/images/24x24/*.png',
         ]
     },
     entry_points = {

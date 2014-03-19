@@ -9,9 +9,9 @@ __requires__ = [
     "fiona>=1.0.2",
     "scimath>=4.1.2",
     "shapely>=1.2.17",
-    "tables>=2.4.0",
+    "pytables>=2.4.0",
     "sdi",
-    "skimage",
-    "sklearn",
+    "scikits.image",
+    "scikit_learn",
     "scipy",
 ]
