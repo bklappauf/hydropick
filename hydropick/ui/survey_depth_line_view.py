@@ -83,7 +83,7 @@ class DepthLineView(HasStrictTraits):
 
     # list of selected groups and lines by name str for information only
     selected = Property(List, depends_on=['current_survey_line_group',
-                                    'selected_survey_lines'])
+                                          'selected_survey_lines'])
 
     # currently selected group
     current_survey_line_group = Supports(ISurveyLineGroup)
@@ -358,14 +358,24 @@ class DepthLineView(HasStrictTraits):
             {lines}
             with the following parameters:
             name = {name}
-            algorithm = {algorithm}
-            args = {args}
+            line_type = {ltype}
             color = {color}
+            locked = {locked}
+            notes = {notes}
+            edited = {edited}
+            source = {source}
+            source name = {sourcename}
+            args = {args}
             '''.format(lines=lines_str,
-                       name=self.model.name,
-                       algorithm=self.source_name,
-                       args=self.model.args,
-                       color=self.model.color)
+                       name=model.name,
+                       ltype=model.line_type,
+                       color=model.color,
+                       locked=model.locked,
+                       notes=model.notes,
+                       edited=model.edited,
+                       source=model.source
+                       sourcename=source_name,
+                       args=model.args)
             logger.info(s)
             # apply to each survey line
             for line in self.selected_survey_lines:
@@ -412,6 +422,39 @@ class DepthLineView(HasStrictTraits):
         # set form to the new line
         self.selected_depth_line_name = key
         self.update_plot()
+
+    def log_model_params(self, lines=None, model=None):
+        ''' log parameters of line for saving or other'''
+        
+        if lines:
+            lines_str = '\n'.join([line.name for line in selected])
+            s0 = 'Creating depth line for the following surveylines:\n' +
+                 '    {lines}\n' + 
+                 '    with the following parameters:\n'
+        else:
+            s0 = "Current model has the following parameters:\n"
+        s1a = ['name = {name}',
+               'line_type = {ltype}',
+               'color = {color}',
+               'locked = {locked}',
+               'notes = {notes}',
+               'edited = {edited}',
+               'source = {source}',
+               'source name = {sourcename}',
+               'args = {args}'
+        ]
+        s1 = '\n'.join(s1a)
+        s = s0 + s1.format(lines=lines_str,
+                           name=model.name,
+                           ltype=model.line_type,
+                           color=model.color,
+                           locked=model.locked,
+                           notes=model.notes,
+                           edited=model.edited,
+                           source=model.source
+                           sourcename=source_name,
+                           args=model.args)
+        logger.info(s)
 
     @on_trait_change('selected_depth_line_name')
     def change_depth_line(self, new):

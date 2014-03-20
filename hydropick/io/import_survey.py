@@ -39,7 +39,6 @@ def get_number_of_bin_files(path):
     file_names = []
     for root, dirs, files in os.walk(path):
         files_bin = [f for f in files if os.path.splitext(f)[1] == '.bin']
-        print files_bin
         file_names += files_bin
     return len(file_names)
 
@@ -83,7 +82,7 @@ def import_lake(name, directory, h5file):
             if os.path.splitext(filename)[1] == '.shp':
                 shp_file = os.path.join(directory, filename)
                 survey_io.import_shoreline_from_file(name, shp_file, h5file)
-                print 'imported shp file:', filename
+                logger.info('imported shp file:{}'.format(filename)
                 break
         shoreline = survey_io.read_shoreline_from_hdf(h5file)
     return shoreline
@@ -105,16 +104,16 @@ def import_sdi(directory, h5file):
         N_dir = len(dirs)
         files_bin = [f for f in files if os.path.splitext(f)[1] == '.bin']
         N_files = len(files_bin)
-        print '\nchecking project folder: "{}"\n with {} sub-directories'\
-               .format(currentd, N_dir)
-        print 'loading {} .bin files'.format(N_files)
+        logger.info('\nchecking project folder: "{}"\n with {} sub-directories'
+                    .format(currentd, N_dir))
+        logger.info('loading {} .bin files'.format(N_files))
         i = 0
         for filename in files_bin:
             i += 1
             i_total += 1
             linename = os.path.splitext(filename)[0]
-            print '{}  ({}/{} in folder : {}/{} total)'\
-                  .format(linename, i, N_files, i_total, N_bin_total)
+            logger.info('{}  ({}/{} in folder : {}/{} total)'
+                        .format(linename, i, N_files, i_total, N_bin_total))
             try:
                 line = read_survey_line_from_hdf(h5file, linename)
             except (IOError, tables.exceptions.NoSuchNodeError):
@@ -151,7 +150,7 @@ def import_survey(directory, with_pick_files=False):
 
     # HDF5 datastore file for survey
     hdf5_file = os.path.join(directory, name + '.h5')
-    print hdf5_file
+    logger.info('hdf5 files is {}'.format(hdf5_file))
 
     # read in core samples
     core_samples = import_cores(os.path.join(directory, 'Coring'), hdf5_file)
