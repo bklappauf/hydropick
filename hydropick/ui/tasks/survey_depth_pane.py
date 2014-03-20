@@ -22,6 +22,7 @@ from hydropick.model.depth_line import DepthLine
 
 logger = logging.getLogger(__name__)
 
+
 class SurveyDepthPane(TraitsDockPane):
     """ The dock pane holding the map view of the survey """
 
