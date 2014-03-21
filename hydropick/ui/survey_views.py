@@ -227,11 +227,9 @@ class PlotContainer(HasTraits):
                 slice_plot = hpc.components[1]
                 if freq == bottom or freq == 'mini':
                     main.x_axis.visible = True
-                    slice_plot.x_axis.visible = True
                     hpc.padding_bottom = HPLOT_PADDING_BOTTOM # MAIN_PADDING_BOTTOM
                 else:
                     main.x_axis.visible = False
-                    slice_plot.x_axis.visible = False
                     hpc.padding_bottom = HPLOT_PADDING_BOTTOM
 
                 legend, highlighter = self.legend_dict.get(freq, [None, None])
@@ -303,7 +301,7 @@ class PlotContainer(HasTraits):
                           bgcolor='beige',
                           origin='top left'
                           )
-        slice_plot.x_axis.visible = False
+        slice_plot.x_axis.visible = True
         slice_key = key + '_slice'
         ydata_key = key + '_y'
         slice_plot.plot((ydata_key, slice_key), name=slice_key)
