@@ -229,6 +229,10 @@ class DepthLineView(HasStrictTraits):
                 self.model.args = self.alg_arg_dict
                 self.zero_out_array_data()
 
+    @on_trait_change('survey_line_name, name, line_type, color, locked, notes')
+    def save_depth_line_changes(self, obj, name, old, new):
+        logger.debug('saved change to {} : {}, {} '.format(name, old, new))
+
     @on_trait_change('apply_button')
     def apply_to_current(self):
         self.apply_settings_to_line()
@@ -447,12 +451,12 @@ class DepthLineView(HasStrictTraits):
         logger.info('saving new depth line to surveyline {}'
                     .format(survey_line.name))
         if model.line_type == 'current surface':
-            line.lake_depths[model.name] = model
-            line.final_lake_depth = model.name
+            survey_line.lake_depths[model.name] = model
+            survey_line.final_lake_depth = model.name
             key = 'POST_' + model.name
         else:
-            line.preimpoundment_depths[model.name] = model
-            line.final_preimpoundment_depth = model.name
+            survey_line.preimpoundment_depths[model.name] = model
+            survey_line.final_preimpoundment_depth = model.name
             key = 'PRE_' + model.name
 
         # set form to the new line
