@@ -48,9 +48,10 @@ ZOOMBOX_ALPHA = 0.3
 
 HPLOT_PADDING = 0
 MAIN_PADDING = 10
-MAIN_PADDING_LEFT = 20
+MAIN_PADDING_LEFT = 25
 MAIN_PADDING_BOTTOM = 10
 MINI_PADDING = 15
+MINI_PADDING_BOTTOM = 20
 
 CONTRAST_MAX = float(20)
 
@@ -224,7 +225,7 @@ class PlotContainer(HasTraits):
                 main = hpc.components[0]
                 if freq == bottom or freq == 'mini':
                     main.x_axis.visible = True
-                    hpc.padding_bottom = MAIN_PADDING_BOTTOM
+                    hpc.padding_bottom = 0 # MAIN_PADDING_BOTTOM
                 else:
                     main.x_axis.visible = False
                     hpc.padding_bottom = MAIN_PADDING_BOTTOM
@@ -284,6 +285,7 @@ class PlotContainer(HasTraits):
                           resizable="v",
                           padding=MAIN_PADDING,
                           padding_left=MAIN_PADDING_LEFT,
+                          padding_bottom=MINI_PADDING_BOTTOM,
                           bgcolor='beige',
                           origin='top left'
                           )

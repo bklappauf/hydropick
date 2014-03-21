@@ -82,7 +82,7 @@ def import_lake(name, directory, h5file):
             if os.path.splitext(filename)[1] == '.shp':
                 shp_file = os.path.join(directory, filename)
                 survey_io.import_shoreline_from_file(name, shp_file, h5file)
-                logger.info('imported shp file:{}'.format(filename)
+                logger.info('imported shp file:{}'.format(filename))
                 break
         shoreline = survey_io.read_shoreline_from_hdf(h5file)
     return shoreline
