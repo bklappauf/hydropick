@@ -149,7 +149,7 @@ class DepthLineView(HasStrictTraits):
                     visible_when='selected_depth_line_name=="New Line"'),
                Item('object.model.line_type'),
                Item('object.model.color'),
-               Item('object.model.lock'),
+               Item('object.model.locked'),
                Item('object.model.notes',
                     editor=TextEditor(auto_set=False, enter_set=False),
                     style='custom',
@@ -364,7 +364,7 @@ class DepthLineView(HasStrictTraits):
             s = 'name already used. To overwrite, select that line, unlock' +\
                 ' and edit, then reapply'
             self.log_problem(s)
-            self.model.lock = True
+            self.model.locked = True
         return not used
 
     def check_alg_ready(self):

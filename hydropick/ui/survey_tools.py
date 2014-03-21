@@ -10,7 +10,7 @@ import numpy as np
 # ETS imports
 from enable.api import BaseTool, KeySpec
 from traits.api import (Float, Enum, Int, Bool, Instance, Str, List, Set,
-                        Property, Event, Any)
+                        Property, Event, Any, Tuple)
 from chaco.api import LinePlot, PlotComponent
 
 #==============================================================================
@@ -41,10 +41,12 @@ class DepthTool(BaseTool):
     '''
     # index of the mouse position for given image
     depth = Float
+    ybounds = Tuple
 
     def normal_mouse_move(self, event):
         newx, newy = self.component.map_data((event.x, event.y))
-        self.depth = newy
+        depth = np.clip(newy, *self.ybounds)
+        self.depth = depth
 
 class InspectorFreezeTool(BaseTool):
     ''' Provides key for "freezing" line inspector tool so that cursor
@@ -128,6 +130,10 @@ class TraceTool(BaseTool):
     toggle_mask_edit_mode = Event
 
     window = Any
+
+    # ybounds for this tool limits the data values to set
+    ybounds = Tuple
+    
     
     ##### private trait  ####
     _mask_value = Float(0)
@@ -234,8 +240,9 @@ class TraceTool(BaseTool):
                     indices, ys = self.fill_in_missing_pts(current_index,
                                                            newy, ydata)
                 else:
+                    clipped_y = np.clip(newy, *self.ybounds)
                     indices, ys = self.fill_in_missing_pts(current_index,
-                                                           newy, ydata)
+                                                           clipped_y, ydata)
                 ydata[indices] = ys
                 data_key = self.key + '_y'
                 self.data.set_data(data_key, ydata)

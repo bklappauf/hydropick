@@ -52,4 +52,4 @@ class IDepthLine(Interface):
     notes = Str
 
     # lock prevents depth line from being edited.
-    lock = Bool
+    locked = Bool

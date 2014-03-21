@@ -89,7 +89,7 @@ def write_depth_line_to_hdf(h5file, depth_line, survey_line_name):
         edited=d.edited,
         color=str(d.color.toTuple()),
         notes=d.notes,
-        lock=d.lock,
+        locked=d.locked,
     )
     if d.line_type == 'current surface':
         line_type = 'current'

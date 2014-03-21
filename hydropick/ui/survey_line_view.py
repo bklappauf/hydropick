@@ -165,10 +165,12 @@ class SurveyLineView(ModelView):
         for key, hpc in self.plot_container.hplot_dict.items():
             if key is not 'mini':
                 main = hpc.components[0]
+                ybounds = self.model.ybounds[key]
                 tool = TraceTool(main)
+                tool.ybounds = ybounds
                 tool.toggle_character = EDIT_MASK_TOGGLE_STATE_CHAR
                 tool.on_trait_change(self.toggle_mask_edit,
-                                    'toggle_mask_edit_event')
+                                     'toggle_mask_edit_event')
                 main.tools.append(tool)
                 tools[key] = tool
         return tools
@@ -191,8 +193,10 @@ class SurveyLineView(ModelView):
         tools = {}
         for key, hpc in self.plot_container.hplot_dict.items():
             if key is not 'mini':
+                ybounds = self.model.ybounds[key]
                 main = hpc.components[0]
                 tool = DepthTool(main)
+                tool.ybounds = ybounds
                 tool.on_trait_change(self.update_depth, 'depth')
                 main.tools.append(tool)
                 tools[key] = tool
@@ -368,6 +372,9 @@ class SurveyLineView(ModelView):
         '''reset all zoom tools'''
         for zoom_tool in self.plot_container.zoom_tools.values():
             zoom_tool._reset_state_pressed()
+            mini = self.plot_container.hplot_dict['mini'].components[0]
+            range_sel_tool = mini.plots['reference'][0].tools[0]
+            range_sel_tool.deselect()
 
     def image_adjustment_dialog(self):
         ''' brings up image C&B edit dialog. close to continue'''

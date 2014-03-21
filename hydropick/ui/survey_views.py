@@ -47,11 +47,12 @@ ZOOMBOX_COLOR = 'lightgreen'
 ZOOMBOX_ALPHA = 0.3
 
 HPLOT_PADDING = 0
-MAIN_PADDING = 10
-MAIN_PADDING_LEFT = 25
-MAIN_PADDING_BOTTOM = 10
+HPLOT_PADDING_BOTTOM = 0
 MINI_PADDING = 15
 MINI_PADDING_BOTTOM = 20
+MAIN_PADDING = 15
+MAIN_PADDING_BOTTOM = 20
+MAIN_PADDING_LEFT = 25
 
 CONTRAST_MAX = float(20)
 
@@ -223,12 +224,15 @@ class PlotContainer(HasTraits):
             for freq, hpc in self.hplot_dict.items():
                 hpc.visible = ((freq in sorted_hplots) or (freq == 'mini'))
                 main = hpc.components[0]
+                slice_plot = hpc.components[1]
                 if freq == bottom or freq == 'mini':
                     main.x_axis.visible = True
-                    hpc.padding_bottom = 0 # MAIN_PADDING_BOTTOM
+                    slice_plot.x_axis.visible = True
+                    hpc.padding_bottom = HPLOT_PADDING_BOTTOM # MAIN_PADDING_BOTTOM
                 else:
                     main.x_axis.visible = False
-                    hpc.padding_bottom = MAIN_PADDING_BOTTOM
+                    slice_plot.x_axis.visible = False
+                    hpc.padding_bottom = HPLOT_PADDING_BOTTOM
 
                 legend, highlighter = self.legend_dict.get(freq, [None, None])
                 if legend:
@@ -269,7 +273,7 @@ class PlotContainer(HasTraits):
             hpc = HPlotContainer(bgcolor='darkgrey',
                                  height=MINI_HEIGHT,
                                  resizable='h',
-                                 padding=0
+                                 padding=HPLOT_PADDING
                                  )
         else:
             hpc = HPlotContainer(bgcolor='lightgrey',
@@ -285,7 +289,17 @@ class PlotContainer(HasTraits):
                           resizable="v",
                           padding=MAIN_PADDING,
                           padding_left=MAIN_PADDING_LEFT,
-                          padding_bottom=MINI_PADDING_BOTTOM,
+                          padding_bottom=MAIN_PADDING_BOTTOM,
+                          bgcolor='beige',
+                          origin='top left'
+                          )
+        mini_slice = Plot(self.data,
+                          width=SLICE_PLOT_WIDTH,
+                          orientation="v",
+                          resizable="v",
+                          padding=MAIN_PADDING,
+                          padding_left=MAIN_PADDING_LEFT,
+                          padding_bottom=MAIN_PADDING_BOTTOM,
                           bgcolor='beige',
                           origin='top left'
                           )
@@ -309,9 +323,11 @@ class PlotContainer(HasTraits):
                     origin='top left',
                     padding=MAIN_PADDING,
                     padding_left=MAIN_PADDING_LEFT,
+                    padding_bottom=MAIN_PADDING_BOTTOM
                     )
         if mini:
-            main.padding = MINI_PADDING
+            #main.padding = MINI_PADDING
+            main.padding_bottom = MINI_PADDING_BOTTOM
 
         # add intensity img to plot and get reference for line inspector
         #************************************************************
@@ -348,6 +364,7 @@ class PlotContainer(HasTraits):
             # first add a reference line to attach it to
             reference = self.make_reference_plot()
             main.add(reference)
+            main.plots['reference'] = [reference]
             # attache range selector to this plot
             range_tool = RangeSelection(reference)
             reference.tools.append(range_tool)
@@ -360,7 +377,7 @@ class PlotContainer(HasTraits):
             main.plot(('zoombox_x', 'zoombox_y'), type='polygon',
                       face_color=ZOOMBOX_COLOR, alpha=ZOOMBOX_ALPHA)
             # add to hplot and dict
-            hpc.add(main)
+            hpc.add(main, mini_slice)
             self.hplot_dict['mini'] = hpc
 
         else:
@@ -489,7 +506,10 @@ class PlotContainer(HasTraits):
         # add data to ArrayPlotData if not there
         if line_key not in self.data.arrays.keys():
             x = self.model.distance_array[depth_line.index_array]
-            y = depth_line.depth_array
+            y_raw = depth_line.depth_array
+            # limit range of plot to ybounds of image/model
+            ybounds = self.model.ybounds[key]
+            y = np.clip(y_raw, *ybounds)
             key_x, key_y = line_key + '_x', line_key + '_y'
             self.data.update({key_x: x, key_y: y})
 
