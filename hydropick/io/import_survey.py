@@ -92,9 +92,6 @@ def import_sdi(directory, h5file):
     from hydropick.model.survey_line_group import SurveyLineGroup
     survey_lines = []
     survey_line_groups = []
-    bad_lines = []
-    approved_lines = []
-
     location, proj_dir = os.path.split(directory)
     N_bin_total = get_number_of_bin_files(directory)
     i_total = 0
@@ -102,36 +99,41 @@ def import_sdi(directory, h5file):
         group_lines = []
         currentd = root.split(location)[1]
         N_dir = len(dirs)
-        files_bin = [f for f in files if os.path.splitext(f)[1] == '.bin']
+        if 'Bad_data' in currentd:
+            files_bin = []
+        else:
+            files_bin = [f for f in files if os.path.splitext(f)[1] == '.bin']
         N_files = len(files_bin)
         logger.info('\nchecking project folder: "{}"\n with {} sub-directories'
                     .format(currentd, N_dir))
         logger.info('loading {} .bin files'.format(N_files))
         i = 0
         for filename in files_bin:
+            # log status
             i += 1
             i_total += 1
             linename = os.path.splitext(filename)[0]
             logger.info('{}  ({}/{} in folder : {}/{} total)'
                         .format(linename, i, N_files, i_total, N_bin_total))
+            # try to read the line
             try:
                 line = read_survey_line_from_hdf(h5file, linename)
             except (IOError, tables.exceptions.NoSuchNodeError):
                 logger.info("Importing sdi file '%s'", filename)
                 try:
-                    import_survey_line_from_file(os.path.join(root,
-                                                              filename),
+                    import_survey_line_from_file(os.path.join(root, filename),
                                                  h5file, linename)
                     line = read_survey_line_from_hdf(h5file, linename)
                 except Exception as e:
-                    # XXX: blind except to read all the lines that we
-                    # can for now
+                    # XXX: blind except to read all the lines we can for now
                     s = 'Reading file {} failed with error "{}"'
                     msg = s.format(filename, e)
                     warnings.warn(msg)
                     logger.warning(msg)
                     line = None
             if line:
+                ### FIXME : need to be merged with proj dir branch
+                line.project_dir = directory
                 group_lines.append(line)
                 
         if group_lines:
@@ -139,7 +141,7 @@ def import_sdi(directory, h5file):
             group = SurveyLineGroup(name=dirname, survey_lines=group_lines)
             survey_lines += group_lines
             survey_line_groups.append(group)
-    return survey_lines, survey_line_groups, bad_lines, approved_lines
+    return survey_lines, survey_line_groups
 
 
 def import_survey(directory, with_pick_files=False):
@@ -159,8 +161,8 @@ def import_survey(directory, with_pick_files=False):
     lake = import_lake(name, os.path.join(directory, 'ForSurvey'), hdf5_file)
 
     # read in sdi data
-    l, g, b, a =  import_sdi(os.path.join(directory, 'SDI_Data'), hdf5_file)
-    survey_lines, survey_line_groups, bad_lines, approved_lines = l, g, b, a
+    l, g =  import_sdi(os.path.join(directory, 'SDI_Data'), hdf5_file)
+    survey_lines, survey_line_groups = l, g
 
     # read in edits to sdi data
     if with_pick_files:
