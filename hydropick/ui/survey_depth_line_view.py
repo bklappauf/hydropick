@@ -81,9 +81,15 @@ class DepthLineView(HasStrictTraits):
     index_array_size = Property(Int, depends_on=['model.index_array, model'])
     depth_array_size = Property(Int, depends_on=['model.depth_array, model'])
 
+    # source is edited as local trait then changed in model with apply
+    # this is needed so that none of the traits modifying the model data will
+    # be updated in the model until the data is actually updated.
+    source = Str
+    source_choices = Property()
+
     # create local traits so that these options can be dynamically changed
     source_name = Str
-    source_names = Property(depends_on=['model.source'])
+    source_names = Property(depends_on=['source'])
 
     # flag allows line creation/edit to continue in apply method
     no_problem = Bool(False)
@@ -148,7 +154,7 @@ class DepthLineView(HasStrictTraits):
     #==========================================================================
 
     traits_view = View(
-        VGroup('survey_line_name',
+        VGroup(Item('survey_line_name', style='readonly'),
                HGroup(Item('show_selected', label='Selected(show)'),
                       UItem('selected',
                             editor=ListEditor(style='readonly'),
@@ -176,13 +182,14 @@ class DepthLineView(HasStrictTraits):
                ),
         Label('Line Data', emphasized=True),
         VGroup(Item('object.model.edited', style='readonly'),
-               Item('object.model.source', enabled_when='not locked'),
+               Item('source', editor=EnumEditor(name='source_choices'),
+                    enabled_when='not locked'),
                Item('source_name',
                     editor=EnumEditor(name='source_names'),
                     enabled_when='not locked'),
                UItem('configure_algorithm',
                      editor=ButtonEditor(label='Configure Algorithm'),
-                     visible_when=('object.model.source == "algorithm"' +
+                     visible_when=('source == "algorithm"' +
                                    ' and not current_algorithm'),
                      enabled_when='not locked'),
                UItem('configure_algorithm_done',
@@ -254,7 +261,9 @@ class DepthLineView(HasStrictTraits):
         ''' if any of these traits are changed on an existing line
         The values will be saved to the surveyline and to disk
         Otherwise it is a new line and values will be save when edit is
-        complete and apply is pressed.
+        complete and apply is pressed.  The colon in the extended name
+        trait of the listener is critical to prevent changing the
+        model from messing up the action of the UI widget.
         '''
 
         if self.on_bin_line:
@@ -366,24 +375,26 @@ class DepthLineView(HasStrictTraits):
             # New Line is Selected
             self.current_dline = self.create_new_line()
         self.model = self.current_dline
+        self.source = self.model.source
+        self.source_name = self.model.source_name
+        self.no_problem = True
         logger.debug('change model to {}, {}'
                      .format(self.model.name, id(self.model)))
-        self.no_problem = True
 
-    @on_trait_change('source_name')
-    def _update_source_name(self):
-        ''' either the algorithm is changed or a new source of data is chosen.
-        either way, reset current algorithm and set model source name
-        and zero the data arrays since by definition these are being changed
-        Note that this is not saved until apply so user can restore original
-        data by just reselecting the line'''
-        logger.debug('source name changed to {}'.format(self.source_name))
-        if not self.model_just_changed:
-            logger.debug('reseting alg and arrays due to source name chg')
-            self.current_algorithm = None
-            self.zero_out_array_data()
-        self.model.source_name = self.source_name
-        self.model_just_changed = False
+    # @on_trait_change('source_name')
+    # def _update_source_name(self):
+    #     ''' either the algorithm is changed or a new source of data is chosen.
+    #     either way, reset current algorithm and set model source name
+    #     and zero the data arrays since by definition these are being changed
+    #     Note that this is not saved until apply so user can restore original
+    #     data by just reselecting the line'''
+    #     logger.debug('source name changed to {}'.format(self.source_name))
+    #     if not self.model_just_changed:
+    #         logger.debug('reseting alg and arrays due to source name chg')
+    #         self.current_algorithm = None
+    #         self.zero_out_array_data()
+    #     self.model.source_name = self.source_name
+    #     self.model_just_changed = False
 
     #==========================================================================
     # Helper functions
@@ -719,14 +730,14 @@ class DepthLineView(HasStrictTraits):
         return d
 
     def _get_source_names(self):
-        source = self.model.source
+        source = self.source
         if source == 'algorithm':
             names = self.data_session.algorithms.keys()
         elif source == 'previous depth line':
             names = self.data_session.depth_dict.keys()
         else:
             # if source is sdi the source name is just the file it came from
-            names = [self.model.source_name]
+            names = [self.source_name]
         return names
 
     def _get_survey_line_name(self):
@@ -767,6 +778,11 @@ class DepthLineView(HasStrictTraits):
         on_bin_line = (self.selected_depth_line_name ==
                        CURRENT_SURFACE_FROM_BIN_LABEL)
         return on_bin_line
+
+    def _get_source_choices(self):
+        choices = DepthLine.class_traits()['source'].get_validate()[1]
+        return choices
+
 
 if __name__ == '__main__':
 
