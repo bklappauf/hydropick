@@ -66,7 +66,10 @@ class SurveyLinePane(TraitsTaskPane):
 
     def on_zoom_box(self):
         ''' currently not enabled from toolbar - use z key'''
-        logger.info("zoom_box_icon not enabled: press 'z'")
+        action = self.task.zoom_box_action
+        logger.info("zoom_box_icon not enabled: press 'z', {},{}"
+                    .format(action, action.checked))
+        self.survey_line_view.zoom_box_toggle(action)
 
     def on_image_adjustment(self):
         ''' Open dialog to adjust image (B&C : task menu)'''

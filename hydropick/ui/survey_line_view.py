@@ -295,6 +295,13 @@ class SurveyLineView(ModelView):
         for tool in self.trace_tools.values():
             tool.set_mask_mode(mode)
 
+    def zoom_box_toggle(self, action):
+        for zoom_tool in self.plot_container.zoom_tools.values():
+            if action.checked:
+                zoom_tool.always_on = True
+            else:
+                zoom_tool.always_on = False
+
     def set_edit_enabled(self, object, name, old, new):
         ''' enables editing tool based on ui edit selector'''
         cv = self.control_view
