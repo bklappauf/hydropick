@@ -13,7 +13,8 @@ import numpy as np
 
 # ETS imports
 from traits.api import (Instance, Event, Str, Property, HasStrictTraits, Int,
-                        on_trait_change, Button, Bool, Supports, List, Dict)
+                        on_trait_change, Button, Bool, Supports, List, Dict,
+                        DelegatesTo)
 from traitsui.api import (View, VGroup, HGroup, Item, UItem, EnumEditor,
                           TextEditor, ListEditor, ButtonEditor, Label)
 
@@ -22,7 +23,9 @@ from ..model.depth_line import DepthLine
 from ..model.i_survey_line_group import ISurveyLineGroup
 from ..model.i_survey_line import ISurveyLine
 from ..model.i_algorithm import IAlgorithm
-from .algorithm_presenter import AlgorithmPresenter
+#from .algorithm_presenter import AlgorithmPresenter
+from .depth_line_presenters import (AlgorithmPresenter, NotesEditorPresenter,
+                                    ApplyToGroupSettingsPresenter)
 from .survey_data_session import SurveyDataSession
 from .survey_views import MsgView
 
@@ -73,6 +76,7 @@ class DepthLineView(HasStrictTraits):
     # current depth line object
     model = Instance(DepthLine)
 
+    locked = DelegatesTo('model')
     # arrays to plot
     index_array_size = Property(Int, depends_on=['model.index_array, model'])
     depth_array_size = Property(Int, depends_on=['model.depth_array, model'])
@@ -132,6 +136,13 @@ class DepthLineView(HasStrictTraits):
     # this trait is saved when the model is changed to allow undoing changes
     current_dline = Instance(DepthLine)
 
+    # used to edit text for the DepthLine notes trait. For some reason
+    # custom style will not update the extended trait designated trait so we
+    # need to make a local trait and update it separately.
+    edit_notes = Event
+    notes = Str
+
+    on_bin_line = Property(depends_on='selected_depth_line_name')
     #==========================================================================
     # Define Views
     #==========================================================================
@@ -153,33 +164,36 @@ class DepthLineView(HasStrictTraits):
         VGroup(Item('object.model.survey_line_name', style='readonly'),
                Item('object.model.name', editor=TextEditor(auto_set=False),
                     visible_when='selected_depth_line_name=="New Line"'),
-               Item('object.model.line_type'),
-               Item('object.model.color'),
-               Item('object.model.locked'),
-               Item('object.model.notes',
-                    editor=TextEditor(auto_set=False, enter_set=False),
-                    style='custom',
-                    height=75, resizable=True),
+               Item('object.model.line_type', enabled_when='not locked'),
+               Item('object.model.color',
+                    enabled_when='not locked or on_bin_line'),
+               Item('object.model.locked',
+                    enabled_when='not on_bin_line'),
+               Item('object.model.notes', editor=TextEditor(read_only=True),
+                    style='custom', height=30, resizable=True),
+               Item('edit_notes', editor=ButtonEditor(label='Edit Notes'),
+                    enabled_when='not locked'),
                ),
         Label('Line Data', emphasized=True),
         VGroup(Item('object.model.edited', style='readonly'),
-               Item('object.model.source'),
+               Item('object.model.source', enabled_when='not locked'),
                Item('source_name',
-                    editor=EnumEditor(name='source_names')),
+                    editor=EnumEditor(name='source_names'),
+                    enabled_when='not locked'),
                UItem('configure_algorithm',
                      editor=ButtonEditor(label='Configure Algorithm'),
                      visible_when=('object.model.source == "algorithm"' +
-                                   ' and not current_algorithm')
-                     ),
+                                   ' and not current_algorithm'),
+                     enabled_when='not locked'),
                UItem('configure_algorithm_done',
                      editor=ButtonEditor(label='Configure Algorithm (DONE)'),
-                     visible_when=('current_algorithm')
-                     ),
+                     visible_when=('current_algorithm'),
+                     enabled_when='not locked'),
                ),
         # these are the buttons to control this pane
-        HGroup(UItem('apply_button',
+        HGroup(UItem('apply_button', enabled_when='not locked',
                      tooltip=APPLY_TOOLTIP),
-               UItem('apply_to_group',
+               UItem('apply_to_group', enabled_when='not locked',
                      tooltip=APPLY_TOOLTIP)
                ),
         height=500,
@@ -243,7 +257,7 @@ class DepthLineView(HasStrictTraits):
         complete and apply is pressed.
         '''
 
-        if self.selected_depth_line_name == CURRENT_SURFACE_FROM_BIN_LABEL:
+        if self.on_bin_line:
             if name != 'color':
                 # this check should never be true since all other widgets
                 # should not be enabled
@@ -270,8 +284,14 @@ class DepthLineView(HasStrictTraits):
                 logger.warning('changes not saved. data session does not' +
                                ' match depth line survey line name')
 
-        logger.debug('saved change to {} : {}, {} '.format(name, old, new))
-        logger.debug('notes={}'.format(self.model.notes))
+        logger.debug('saved change to {} : from {} to {} '
+                     .format(name, old, new))
+
+    @on_trait_change('edit_notes')
+    def note_edit_dialog(self, new):
+        view = NotesEditorPresenter(notes=self.model.notes)
+        view.edit_traits()
+        self.model.notes = view.notes
 
     @on_trait_change('apply_button')
     def apply_to_current(self):
@@ -743,6 +763,10 @@ class DepthLineView(HasStrictTraits):
             num_lines = 0
         return ['LINES: {}'.format(num_lines)] + all_lines
 
+    def _get_on_bin_line(self):
+        on_bin_line = (self.selected_depth_line_name ==
+                       CURRENT_SURFACE_FROM_BIN_LABEL)
+        return on_bin_line
 
 if __name__ == '__main__':
 
