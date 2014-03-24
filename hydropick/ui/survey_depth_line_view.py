@@ -234,7 +234,7 @@ class DepthLineView(HasStrictTraits):
     @on_trait_change('model.[{}]'.format(MODEL_TRAITS_TO_SAVE_ON_CHANGE))
     def save_depth_line_changes(self, obj, name, old, new):
         logger.debug('saved change to {} : {}, {} '.format(name, old, new))
-
+        logger.debug('notes={}'.format(self.model.notes))
     @on_trait_change('apply_button')
     def apply_to_current(self):
         self.apply_settings_to_line()
@@ -678,6 +678,8 @@ class DepthLineView(HasStrictTraits):
 
     def _get_depth_lines(self):
         # get list of names of depthlines for the UI
+        logger.debug('getting depthlines. sel line is {}'
+                     .format(self.selected_depth_line_name))
         if self.data_session:
             lines = ['New Line'] + self.data_session.depth_dict.keys()
         else:
