@@ -34,6 +34,8 @@ UPDATE_ARRAYS_TOOLTIP = \
 APPLY_TOOLTIP = \
     'applies current setting to line, but does not update data'
 
+MODEL_TRAITS_TO_SAVE_ON_CHANGE = (
+    'survey_line_name, name, line_type, color, locked, notes')
 
 class DepthLineView(HasStrictTraits):
     """ View Class for working with survey line data to find depth profile.
@@ -229,7 +231,7 @@ class DepthLineView(HasStrictTraits):
                 self.model.args = self.alg_arg_dict
                 self.zero_out_array_data()
 
-    @on_trait_change('survey_line_name, name, line_type, color, locked, notes')
+    @on_trait_change('model.[{}]'.format(MODEL_TRAITS_TO_SAVE_ON_CHANGE))
     def save_depth_line_changes(self, obj, name, old, new):
         logger.debug('saved change to {} : {}, {} '.format(name, old, new))
 
