@@ -35,7 +35,11 @@ APPLY_TOOLTIP = \
     'applies current setting to line, but does not update data'
 
 MODEL_TRAITS_TO_SAVE_ON_CHANGE = (
-    'survey_line_name, name, line_type, color, locked, notes')
+    'name, line_type, color, locked, notes')
+
+CURRENT_SURFACE_FROM_BIN_NAME = 'current_surface_from_bin'
+CURRENT_SURFACE_FROM_BIN_LABEL = 'POST_' + CURRENT_SURFACE_FROM_BIN_NAME
+
 
 class DepthLineView(HasStrictTraits):
     """ View Class for working with survey line data to find depth profile.
@@ -231,10 +235,44 @@ class DepthLineView(HasStrictTraits):
                 self.model.args = self.alg_arg_dict
                 self.zero_out_array_data()
 
-    @on_trait_change('model.[{}]'.format(MODEL_TRAITS_TO_SAVE_ON_CHANGE))
+    @on_trait_change('model:[{}]'.format(MODEL_TRAITS_TO_SAVE_ON_CHANGE))
     def save_depth_line_changes(self, obj, name, old, new):
+        ''' if any of these traits are changed on an existing line
+        The values will be saved to the surveyline and to disk
+        Otherwise it is a new line and values will be save when edit is
+        complete and apply is pressed.
+        '''
+
+        if self.selected_depth_line_name == CURRENT_SURFACE_FROM_BIN_LABEL:
+            if name != 'color':
+                # this check should never be true since all other widgets
+                # should not be enabled
+                self.log_problem('cannot change surface line from original' +
+                                 ' data, except for the color. Resetting ' +
+                                 'value and selecting New Line')
+                # reset trait.  Cannot reset selected line because we
+                # cannot set the named traits widget inside its handler.
+                dline = self.model
+                trait_name = name
+                prev_value = old
+                self.selected_depth_line_name = 'New Line'
+                setattr(dline, trait_name, prev_value)
+
+        if self.selected_depth_line_name != 'New Line' and self.no_problem:
+            # editing existing line so save changes to disk
+            survey_line = self.data_session.survey_line
+            match = self.model.survey_line_name == survey_line.name
+            if match:
+                logger.debug('save trait {}={}'.format(name, new))
+                self.save_model_to_surveyline(model=self.model,
+                                              survey_line=survey_line)
+            else:
+                logger.warning('changes not saved. data session does not' +
+                               ' match depth line survey line name')
+
         logger.debug('saved change to {} : {}, {} '.format(name, old, new))
         logger.debug('notes={}'.format(self.model.notes))
+
     @on_trait_change('apply_button')
     def apply_to_current(self):
         self.apply_settings_to_line()
@@ -300,15 +338,17 @@ class DepthLineView(HasStrictTraits):
     def change_depth_line(self, new):
         ''' selected line has changed so use the selection to change the
         current model to selected or create new one if New Line'''
-        source_name = self.source_name
         if new != 'New Line':
             # Existing line: edit copy of line until apply button clicked
             # then it will reploce the line in the line dictionary
             self.current_dline = self.data_session.depth_dict[new]
         else:
-            # New Line is Selected 
+            # New Line is Selected
             self.current_dline = self.create_new_line()
-        self.model =  self.current_dline
+        self.model = self.current_dline
+        logger.debug('change model to {}, {}'
+                     .format(self.model.name, id(self.model)))
+        self.no_problem = True
 
     @on_trait_change('source_name')
     def _update_source_name(self):
@@ -382,8 +422,8 @@ class DepthLineView(HasStrictTraits):
         if not_alg or not good_alg_name:
             self.log_problem('Invalid algorithm! Application Problem')
         if self.no_problem:
-            # get algorithm instance for selected algorithmn. 
-            # Initiates configure dialog. 
+            # get algorithm instance for selected algorithmn.
+            # Initiates configure dialog.
             # This should apply changes to model.args as user edits args
             self.set_current_algorithm()
         # check that arguments match model. Otherwise these need to be set.
@@ -466,14 +506,14 @@ class DepthLineView(HasStrictTraits):
         self.update_plot()
         # update survey_line on disk
         survey_line.save_to_disk()
-        
+
     def log_model_params(self, lines=None, model=None):
         ''' log parameters of line for saving or other'''
-        
+
         if lines:
             lines_str = '\n'.join([line.name for line in lines])
             s0 = ('Creating depth line for the following surveylines:\n' +
-                  '    {lines}\n' + 
+                  '    {lines}\n' +
                   '    with the following parameters:\n')
         else:
             s0 = "Current model has the following parameters:\n"
