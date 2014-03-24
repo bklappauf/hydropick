@@ -21,6 +21,7 @@ from .depth_line import DepthLine
 
 logger = logging.getLogger(__name__)
 
+CURRENT_SURFACE_FROM_BIN_COLOR = 'white'
 
 @provides(ISurveyLine)
 class SurveyLine(HasTraits):
@@ -177,16 +178,17 @@ class SurveyLine(HasTraits):
             line_type='current surface',
             source='sdi_file',
             source_name=filename,
-            index_array=self.trace_num - 1,
+            index_array=np.asarray(self.trace_num - 1, dtype=np.int32),
             depth_array=sdi_dict_raw['depth_r1'],
+            color=CURRENT_SURFACE_FROM_BIN_COLOR,
             lock = True
         )
         survey_io.write_depth_line_to_hdf(hdf5_file, sdi_surface, self.name)
         # depth lines stored separately
         self.lake_depths = survey_io.read_pick_lines_from_hdf(
-                                     hdf5_file, self.name, 'current')
+            hdf5_file, self.name, 'current')
         self.preimpoundment_depths = survey_io.read_pick_lines_from_hdf(
-                                     hdf5_file, self.name, 'preimpoundment')
+            hdf5_file, self.name, 'preimpoundment')
 
     def nearby_core_samples(self, core_samples, dist_tol=100):
         """ Find core samples from a list of CoreSample instances

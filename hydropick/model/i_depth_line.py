@@ -9,6 +9,8 @@ from __future__ import absolute_import
 
 from traits.api import Interface, Str, Enum, Array, Bool, Color, Dict
 
+SOURCE_TYPES = ['algorithm', 'previous depth line', 'sdi_file']
+
 
 class IDepthLine(Interface):
     """ An interface representing a depth line
@@ -21,14 +23,14 @@ class IDepthLine(Interface):
     #: the name of the survey line this depth line belongs to
     survey_line_name = Str
 
-    #: name given to this line
+    #: name given to this lineDL
     name = Str
 
     #: line type
     line_type = Enum('current surface', 'pre-impoundment surface')
 
     #: source of the line's depth data
-    source = Enum('algorithm', 'previous depth line', 'sdi_file', 'manual')
+    source = Enum(*SOURCE_TYPES)
 
     #: name of source: like name of algorithm or source line to look up source
     source_name = Str
