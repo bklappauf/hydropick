@@ -14,7 +14,7 @@ import numpy as np
 # ETS imports
 from traits.api import (Instance, Event, Str, Property, HasStrictTraits, Int,
                         on_trait_change, Button, Bool, Supports, List, Dict,
-                        DelegatesTo)
+                        DelegatesTo, cached_property)
 from traitsui.api import (View, VGroup, HGroup, Item, UItem, EnumEditor,
                           TextEditor, ListEditor, ButtonEditor, Label)
 
@@ -67,6 +67,7 @@ class DepthLineView(HasStrictTraits):
     # list of available depth lines extracted from survey line for choices
     depth_lines = Property(depends_on=['data_session',
                                        'data_session.depth_lines_updated'])
+    #                           cached=True)
 
     # name of depth_line to view chosen from pulldown of line choices.
     selected_depth_line_name = Str
@@ -249,6 +250,8 @@ class DepthLineView(HasStrictTraits):
         ''' current algorithm or its arguments have changed
         -  this updates the model.args values to match algorithm args
         -  this zeros out data arrays since the change implies new data
+        -  this is done to self.model which will either be the target
+           of the data update or will be a template for other depth lines.
         '''
         alg = self.current_algorithm
         if alg:
@@ -291,15 +294,16 @@ class DepthLineView(HasStrictTraits):
             survey_line = self.data_session.survey_line
             match = self.model.survey_line_name == survey_line.name
             if match:
-                logger.debug('save trait {}={}'.format(name, new))
+                logger.debug('saved change to {} : from {} to {} '
+                             .format(name, old, new))
                 self.save_model_to_surveyline(model=self.model,
                                               survey_line=survey_line)
             else:
                 logger.warning('changes not saved. data session does not' +
                                ' match depth line survey line name')
-
-        logger.debug('saved change to {} : from {} to {} '
-                     .format(name, old, new))
+        else:
+            logger.debug('trait {} not updated.  Selected line is {}'
+                         .format(name, self.selected_depth_line_name))
 
     @on_trait_change('edit_notes')
     def note_edit_dialog(self, new):
@@ -757,15 +761,25 @@ class DepthLineView(HasStrictTraits):
             name = 'No Survey Line Selected'
         return name
 
+    @cached_property
     def _get_depth_lines(self):
         # get list of names of depthlines for the UI
-        logger.debug('getting depthlines. sel line is {}'
-                     .format(self.selected_depth_line_name))
+        # logger.debug('getting depthlines. sel line is {}, depth lines is {}'
+        #              .format(self.selected_depth_line_name, self.depth_lines))
         if self.data_session:
             lines = ['New Line'] + self.data_session.depth_dict.keys()
         else:
             lines = []
+        logger.debug('updated depthlines {}'.format(lines))
         return lines
+        # if self._depth_lines is None:
+        #     if self.data_session:
+        #         lines = ['New Line'] + self.data_session.depth_dict.keys()
+        #     else:
+        #         lines = []
+        #     self._depth_lines = lines
+        #     logger.debug('updated depthlines {}'.format(lines))
+        # return lines
 
     def _get_index_array_size(self):
         return self._array_size(self.model.index_array)
