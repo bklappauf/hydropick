@@ -58,26 +58,26 @@ class DepthLineView(HasStrictTraits):
     # current data session with relevant info for the current line
     data_session = Instance(SurveyDataSession)
 
-    # name of current line in editor
-    survey_line_name = Property(depends_on=['data_session']
-                                )
-
-    # list of available depth lines extracted from survey line
-    depth_lines = Property(depends_on=['data_session',
-                                       'data_session.depth_lines_updated']
-                           )
-
-    # name of depth_line to view chosen from pulldown of all available lines.
-    selected_depth_line_name = Str
+    # name of current line in editor: convenience for display
+    survey_line_name = Property(depends_on=['data_session'])
 
     # name of hdf5_file for this survey in case we need to load survey lines
     hdf5_file = Str
 
+    # list of available depth lines extracted from survey line for choices
+    depth_lines = Property(depends_on=['data_session',
+                                       'data_session.depth_lines_updated'])
+
+    # name of depth_line to view chosen from pulldown of line choices.
+    selected_depth_line_name = Str
+
     # current depth line object
     model = Instance(DepthLine)
 
+    # convenience to disable widgets when model locked
     locked = DelegatesTo('model')
-    # arrays to plot
+
+    # arrays to plot sizes: used to check they are filled and equal
     index_array_size = Property(Int, depends_on=['model.index_array, model'])
     depth_array_size = Property(Int, depends_on=['model.depth_array, model'])
 
@@ -91,56 +91,49 @@ class DepthLineView(HasStrictTraits):
     source_name = Str
     source_names = Property(depends_on=['source'])
 
+    # Set of selected survey lines (including groups) to apply algorithm to
+    selected_survey_lines = List(Supports(ISurveyLine))
+
+    # list of selected groups and lines by name str for information only
+    selected = Property(List, depends_on=['current_survey_line_group',
+                                          'selected_survey_lines'])
+
+    # dict of available algorithms
+    algorithms = Dict
+
+    # convenience property for getting algorithm arguments
+    alg_arg_dict = Property()
+
+    # currently configured algorithm: used as model for alg edit dialog
+    current_algorithm = Supports(IAlgorithm)
+
+    ##### BOOLS / FLAGS #######################################################
+    # convenience condition for functions related to binary sourced line
+    on_bin_line = Property(Bool, depends_on='selected_depth_line_name')
+
+    # determines if apply will overwrite line with same name
+    overwrite = Bool(True)
+
+    # determine if apply to group will overwrite locked lines with same name
+    write_if_locked = Bool(False)
+
     # flag allows line creation/edit to continue in apply method
     no_problem = Bool(False)
 
     # determines whether to show the list of selected groups and lines
     show_selected = Bool(False)
 
-    # list of selected groups and lines by name str for information only
-    selected = Property(List, depends_on=['current_survey_line_group',
-                                          'selected_survey_lines'])
+    ##### BUTTONS FOR THE VIEW ################################################
 
-    # currently selected group
-    current_survey_line_group = Supports(ISurveyLineGroup)
-
-    # Set of selected survey lines (including groups) to apply algorithm to
-    selected_survey_lines = List(Supports(ISurveyLine))
-
-    # dict of algorithms
-    algorithms = Dict
-
-    # convenience property for getting algorithm arguments
-    alg_arg_dict = Property()
-
-    # currently configured algorithm
-    current_algorithm = Supports(IAlgorithm)
-
-    ##### BUTTONS FOR THE VIEW ####
-
-    # applys settings to  DepthLine updating object and updating survey line
-    apply_button = Button('Apply')
+    # applys settings to DepthLine updating object and updating survey line
+    apply_button = Event
 
     # applys settings each survey line in selected lines
-    apply_to_group = Button('Apply to Group')
+    apply_to_group = Event
 
     # button to open algorithm configure dialog
     configure_algorithm = Event()
     configure_algorithm_done = Event()
-
-    # flag to prevent source_name listener from acting when model changes
-    model_just_changed = Bool(True)
-
-    # Private algorithm presenter initialized at creation time
-    _algorithm_presenter = Instance(AlgorithmPresenter, ())
-
-    # determines if apply will overwrite line with same name
-    overwrite = Bool(True)
-
-    write_if_locked = Bool(False)
-
-    # this trait is saved when the model is changed to allow undoing changes
-    current_dline = Instance(DepthLine)
 
     # used to edit text for the DepthLine notes trait. For some reason
     # custom style will not update the extended trait designated trait so we
@@ -148,7 +141,19 @@ class DepthLineView(HasStrictTraits):
     edit_notes = Event
     notes = Str
 
-    on_bin_line = Property(depends_on='selected_depth_line_name')
+    # currently used but not needed as trait.  Eventually this could be
+    # converted to trait that saves initial line settings when the model is
+    # changed to allow undoing changes
+    current_dline = Instance(DepthLine)
+
+    #### DEPRECATED - LEAVE IN JUST IN CASE####################################
+
+    # currently selected group (#### DEPRECATED - LEAVE IN JUST IN CASE)
+    current_survey_line_group = Supports(ISurveyLineGroup)
+
+    # flag to prevent source_name listener from acting when model changes
+    model_just_changed = Bool(True)
+
     #==========================================================================
     # Define Views
     #==========================================================================
@@ -198,9 +203,13 @@ class DepthLineView(HasStrictTraits):
                      enabled_when='not locked'),
                ),
         # these are the buttons to control this pane
-        HGroup(UItem('apply_button', enabled_when='not locked',
+        HGroup(UItem('apply_button',
+                     editor=ButtonEditor(label='Apply'),
+                     enabled_when='not locked',
                      tooltip=APPLY_TOOLTIP),
-               UItem('apply_to_group', enabled_when='not locked',
+               UItem('apply_to_group',
+                     editor=ButtonEditor(label='Apply To Group'),
+                     enabled_when='not locked',
                      tooltip=APPLY_TOOLTIP)
                ),
         height=500,
@@ -215,10 +224,6 @@ class DepthLineView(HasStrictTraits):
         ''' provide initial value for selected depth line in view'''
         return 'New Line'
 
-    # def _data_session_default(self):
-    #     ''' provide initial value for data_session'''
-    #     return SurveyDataSession()
-
     #==========================================================================
     # Notifications or Callbacks
     #==========================================================================
@@ -229,15 +234,15 @@ class DepthLineView(HasStrictTraits):
         when buttons are pressed which edits current alg object.
         Buttons show up when alg is selected.
         '''
-        alg_name = self.model.source_name
+        logger.debug('source name = {}'.format(self.source_name))
+        alg_name = self.source_name
         logger.debug('configuring alg: {}. Alg exists={}, model args={}'
                      .format(alg_name, self.current_algorithm, self.model.args))
         if self.current_algorithm is None:
-            self.set_current_algorithm()
-        self._algorithm_presenter.algorithm = self.current_algorithm
-        self._algorithm_presenter.edit_traits()
-        # (for some reason we have to set this manually - doesn't seem right)
-        self.current_algorithm = self._algorithm_presenter.algorithm
+            self.set_current_algorithm(alg_name=alg_name)
+        view = AlgorithmPresenter(algorithm=self.current_algorithm)
+        view.edit_traits()
+        self.current_algorithm = view.algorithm
 
     @on_trait_change('current_algorithm.+')
     def update_model_args(self, object, name, old, new):
@@ -606,11 +611,12 @@ class DepthLineView(HasStrictTraits):
             # line data reset by update so any edits are lost.
             self.model.edited = False
 
-    def set_current_algorithm(self):
+    def set_current_algorithm(self, alg_name=None):
         ''' Set current alg based on model.
         setting current alg will update model.args so need to save these
         and apply if neccesary after setting current alg.'''
-        alg_name = self.model.source_name
+        if alg_name is None:
+            alg_name = self.model.source_name
         model_args = self.model.args
         self.current_algorithm = self.algorithms[alg_name]()
         if model_args:
