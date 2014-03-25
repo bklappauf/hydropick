@@ -85,7 +85,7 @@ class DepthLineView(HasStrictTraits):
     # this is needed so that none of the traits modifying the model data will
     # be updated in the model until the data is actually updated.
     source = Str
-    source_choices = Property()
+    source_choices = Property(depends_on='selected_depth_line_name')
 
     # create local traits so that these options can be dynamically changed
     source_name = Str
@@ -374,11 +374,13 @@ class DepthLineView(HasStrictTraits):
         else:
             # New Line is Selected
             self.current_dline = self.create_new_line()
+        #self.source_name = self.current_dline.source_name
         self.model = self.current_dline
         self.source = self.model.source
         self.source_name = self.model.source_name
+        print 'sname',self.model.source_name
         self.no_problem = True
-        logger.debug('change model to {}, {}'
+        logger.debug('change model to "{}", {}'
                      .format(self.model.name, id(self.model)))
 
     # @on_trait_change('source_name')
@@ -567,7 +569,7 @@ class DepthLineView(HasStrictTraits):
                            notes=model.notes,
                            edited=model.edited,
                            source=model.source,
-                           sourcename=source_name,
+                           sourcename=model.source_name,
                            args=model.args)
         logger.info(s)
 
@@ -730,6 +732,7 @@ class DepthLineView(HasStrictTraits):
         return d
 
     def _get_source_names(self):
+        """ update possible source names when source selection is changed"""
         source = self.source
         if source == 'algorithm':
             names = self.data_session.algorithms.keys()
@@ -737,7 +740,8 @@ class DepthLineView(HasStrictTraits):
             names = self.data_session.depth_dict.keys()
         else:
             # if source is sdi the source name is just the file it came from
-            names = [self.source_name]
+            names = [self.model.source_name]
+        #logger.debug('updated source {} names to {}'.format(source, names))
         return names
 
     def _get_survey_line_name(self):
@@ -780,7 +784,9 @@ class DepthLineView(HasStrictTraits):
         return on_bin_line
 
     def _get_source_choices(self):
-        choices = DepthLine.class_traits()['source'].get_validate()[1]
+        choices = list(DepthLine.class_traits()['source'].get_validate()[1])
+        if not self.on_bin_line:
+            choices.remove('sdi_file')
         return choices
 
 
