@@ -21,15 +21,13 @@ from traits.api import (Instance, Str, List, HasTraits, Float, Property,
                         Callable, Tuple, CFloat, Event)
 from traitsui.api import (View, Item, EnumEditor, UItem, InstanceEditor,
                           TextEditor, RangeEditor, Label, HGroup, VGroup,
-                          CheckListEditor, Group, ButtonEditor
-)
+                          CheckListEditor, Group, ButtonEditor)
 from chaco import default_colormaps
 from chaco.api import (Plot, ArrayPlotData, VPlotContainer, HPlotContainer,
                        Legend, create_scatter_plot, PlotComponent,
-                       create_line_plot, DataRange1D)
+                       create_line_plot)
 from chaco.tools.api import (PanTool, ZoomTool, RangeSelection, LineInspector,
                              RangeSelectionOverlay, LegendHighlighter)
-from chaco.base import n_gon
 
 # Local imports
 from .survey_tools import InspectorFreezeTool
@@ -63,6 +61,10 @@ MASK_EDGE_COLOR = 'black'
 MASK_FACE_COLOR = 'black'
 MASK_ALPHA = 0.5
 
+# used to remove this from choices of lines to edit
+CURRENT_SURFACE_FROM_BIN_NAME = 'current_surface_from_bin'
+CURRRENT_SURFACE_FROM_BIN_LABEL = 'POST_' + CURRENT_SURFACE_FROM_BIN_NAME
+
 
 class InstanceUItem(UItem):
     '''Convenience class for inluding instance in view as Item'''
@@ -81,7 +83,7 @@ class ColormapEditView(HasTraits):
               Item('colormap')
               ),
         buttons=["OK", "Cancel"],
-        )
+    )
 
 
 class PlotContainer(HasTraits):
@@ -132,6 +134,8 @@ class PlotContainer(HasTraits):
     mask_color = Str(MASK_EDGE_COLOR)
 
     zoom_tools = Dict
+
+    legend_drag = Event
     #==========================================================================
     # Define Views
     #==========================================================================
@@ -224,10 +228,9 @@ class PlotContainer(HasTraits):
             for freq, hpc in self.hplot_dict.items():
                 hpc.visible = ((freq in sorted_hplots) or (freq == 'mini'))
                 main = hpc.components[0]
-                slice_plot = hpc.components[1]
                 if freq == bottom or freq == 'mini':
                     main.x_axis.visible = True
-                    hpc.padding_bottom = HPLOT_PADDING_BOTTOM # MAIN_PADDING_BOTTOM
+                    hpc.padding_bottom = HPLOT_PADDING_BOTTOM
                 else:
                     main.x_axis.visible = False
                     hpc.padding_bottom = HPLOT_PADDING_BOTTOM
@@ -311,7 +314,6 @@ class PlotContainer(HasTraits):
         slice_plot.plot(('slice_depth_depth', 'slice_depth_y'),
                         name=slice_depth_key, color='red')
         self.update_slice_depth_line_plot(slice_plot, depth=0)
-
 
         # make main plot for editing depth lines
         #************************************************************
@@ -415,10 +417,12 @@ class PlotContainer(HasTraits):
             legend_highlighter = LegendHighlighter(legend,
                                                    drag_button="right")
             legend.tools.append(legend_highlighter)
+
             self.update_legend_plots(legend, main)
             legend.visible = False
             self.legend_dict[key] = [legend, legend_highlighter]
             main.overlays.append(legend)
+            legend_highlighter.on_trait_change(self.legend_moved, '_drag_state')
 
             # add main and slice plot to hplot container and dict
             #****************************************************
@@ -429,9 +433,15 @@ class PlotContainer(HasTraits):
 
         return hpc
 
+    def legend_moved(self, new):
+        logger.debug('legend moved {}'.format(new))
+        self.legend_drag = new
+
     def update_legend_plots(self, legend, plot):
-        ''' update legend if lines added or changed'''
-        for k, v in self.model.depth_dict.items():
+        ''' update legend if lines added or changed
+        use depth_dict as key source since we only want depth lines'''
+        legend.plots = {}
+        for k in self.model.depth_dict:
             legend.plots[k] = plot.plots[k]
 
     def update_all_line_plots(self, update=False):
@@ -448,6 +458,7 @@ class PlotContainer(HasTraits):
                                                    drag_button="right")
             if highlighter in legend.tools:
                 legend.tools.remove(highlighter)
+            legend_highlighter.on_trait_change(self.legend_moved, '_drag_state')
             legend.tools.append(legend_highlighter)
             plot.invalidate_and_redraw()
 
@@ -486,6 +497,16 @@ class PlotContainer(HasTraits):
         line plots.  When depth_dict is updated, check all keys to see all
         lines are plotted.  Update=True will replot all lines even if already
         there (for style changes)'''
+        lineplots = [item for item in  plot.plots.items() if 
+                     (item[0].startswith('PRE') or item[0].startswith('POST'))]
+        for line_key, line_plot in lineplots:
+            line_plot_deleted = line_key not in self.model.depth_dict.keys()
+            if line_plot_deleted:
+                # remove from plot dict
+                plot_key = key + '_' + line_key
+                self.plot_dict.pop(plot_key)
+                # remove from plot
+                plot.delplot(line_key)
 
         for line_key, depth_line in self.model.depth_dict.items():
             not_plotted = line_key not in plot.plots
@@ -567,7 +588,6 @@ class PlotContainer(HasTraits):
                 if mapper.range.high != high:
                     mapper.range.high = high
 
-
     def _range_selection_handler(self, event):
         ''' updates the main plots when the range selector in the mini plot is
         adjusted.  The event obj should be a tuple (low, high) in data space
@@ -603,7 +623,7 @@ class PlotContainer(HasTraits):
         ''' when meta data changes call this with relevant hplots to update
         slice from cursor position'''
 
-        slice_key = key+'_slice'
+        slice_key = key + '_slice'
         img = hplot.components[0].plots[key][0]
 
         # get slice plot and sinc the value to the img plot
@@ -635,13 +655,16 @@ class PlotContainer(HasTraits):
             # now get x position to see if we are close to a core
             try:
                 # abs_index is the trace number for the selected image index
-                abs_index = self.model.freq_trace_num[key][x_index] - 1
+                if x_index:
+                    abs_index = self.model.freq_trace_num[key][x_index] - 1
+                else:
+                    abs_index = 0
                 x_pos = self.model.distance_array[abs_index]
             except IndexError:
                 # if for some reason the tool returns a crazy index then bound
                 # it to array limits.
                 logger.info('cursor index out of bounds: value set to limit')
-                indices = self.model.freq_trace_num[key]-1
+                indices = self.model.freq_trace_num[key] - 1
                 x_ind_max = indices.size - 1
                 x_ind_clipped = np.clip(x_index, 0, x_ind_max)
                 abs_index = indices[x_ind_clipped]
@@ -660,8 +683,8 @@ class PlotContainer(HasTraits):
                             core_plot.visible = False
                     except ValueError:
                         debug = 'core dist check xpos,loc,abs(x-l)\n={},{},{}'
-                        absdiff = np.abs(x_pos-loc)
-                        logger.debug(debug.format(x_pos, loc, absdiff))
+                        absdiff = np.abs(x_pos - loc)
+                        logger.debug(debug.format(x_pos[:3], loc, absdiff[:3]))
 
         else:   # clear all slice plots
             self.data.update_data({slice_key: np.array([])})
@@ -751,13 +774,13 @@ class ControlView(HasTraits):
         VGroup(
             HGroup(
                 UItem('edit',
-                    tooltip='select editing depthline, or editing bad '
+                      tooltip='select editing depthline, or editing bad '
                 ),
                 Item('object.model.selected_target',
                      editor=EnumEditor(name='target_choices'),
                      tooltip='Edit red line with right mouse button',
                      visible_when='edit=="Editing"'
-                 ),
+                ),
                 UItem('bad_data_mode_toggle',
                       editor=ButtonEditor(label='Marking as bad'),
                       tooltip='click again to set to unmark mode',
@@ -809,6 +832,8 @@ class ControlView(HasTraits):
         '''
         if self.model:
             choices = ['None'] + self.model.target_choices
+        if CURRRENT_SURFACE_FROM_BIN_LABEL in choices:
+            choices.remove(CURRRENT_SURFACE_FROM_BIN_LABEL)
         self.model.selected_target = 'None'
         return choices or ['None']
 

@@ -22,6 +22,8 @@ from ..model.survey_line import SurveyLine
 
 logger = logging.getLogger(__name__)
 
+CURRENT_SURFACE_FROM_BIN_NAME = 'current_surface_from_bin'
+
 
 class SurveyDataSession(HasTraits):
     """ Model for SurveyLineView.
@@ -161,6 +163,22 @@ class SurveyDataSession(HasTraits):
             self.preimpoundment_depth_choices = self.preimpoundment_depths.keys()
         else:
             self.preimpoundment_depth_choices = []
+
+    @on_trait_change('lake_depth_choices')
+    def _update_final(self):
+        self.update_final()
+
+    def update_final(self):
+        """ This trys to reset final lake depth to original bin value
+        if it gets set to something in valid.  Typically if current
+        final lake depth is deleted"""
+        if self.survey_line:
+            valid_final_lake_depth = (self.final_lake_depth in
+                                      self.lake_depth_choices)
+            if not valid_final_lake_depth:
+                default = self.lake_depths.get(
+                    CURRENT_SURFACE_FROM_BIN_NAME, None)
+                self.final_lake_depth = default.name
 
     #==========================================================================
     # Helper functions

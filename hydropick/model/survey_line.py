@@ -21,6 +21,8 @@ from .depth_line import DepthLine
 
 logger = logging.getLogger(__name__)
 
+CURRENT_SURFACE_FROM_BIN_NAME = 'current_surface_from_bin'
+
 
 @provides(ISurveyLine)
 class SurveyLine(HasTraits):
@@ -103,7 +105,8 @@ class SurveyLine(HasTraits):
     # user comment on status (who approved it or why its bad fore example)
     status_string = Str('')
 
-    # mask is bool array, size trace_num,  indicating bad traces. True is bad/masked
+    # mask is bool array, size trace_num,  indicating bad traces.
+    # True is bad/masked
     mask = Array(Bool)
 
     # indicated if mask has been defined for this line
@@ -111,6 +114,11 @@ class SurveyLine(HasTraits):
 
     # project directory where this survey line will save itself
     project_dir = Str
+
+    def _final_lake_depth_default(self):
+        default = self.lake_depths.get(
+            CURRENT_SURFACE_FROM_BIN_NAME, None)
+        return default.name
 
     def _get_masked(self):
         ''' rather than being externally set this trait is set when mask
