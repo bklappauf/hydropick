@@ -9,7 +9,7 @@ import numpy as np
 
 # ETS imports
 from enable.api import BaseTool, KeySpec
-from traits.api import (Float, Enum, Int, Bool, Instance, Str, List, Set,
+from traits.api import (Float, Enum, CInt, Bool, Instance, Str, List, Set,
                         Property, Event, Any, Tuple)
 from chaco.api import LinePlot, PlotComponent
 
@@ -25,7 +25,7 @@ class LocationTool(BaseTool):
     taken directly from plot data.
     '''
     # index of the mouse position for given image
-    image_index = Int
+    image_index = CInt
 
     def normal_mouse_move(self, event):
 
@@ -103,7 +103,7 @@ class TraceTool(BaseTool):
 
     # these record last mouse position so that new position can be checked for
     # missing points -- i.e. delta_index should be 1
-    last_index = Int(np.nan)
+    last_index = CInt(np.nan)
     last_y = Float(np.nan)
 
     depth = Float
